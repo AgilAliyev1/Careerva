@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { GraduationCap } from "lucide-react";
+import { CareervaLogo } from "@/components/CareervaLogo";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export default function Auth() {
@@ -48,8 +48,10 @@ export default function Auth() {
 
       toast({
         title: "Success!",
-        description: "Your account has been created. You can now sign in.",
+        description: "Choose a subscription plan to unlock live courses.",
       });
+
+      navigate("/subscription");
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -94,8 +96,8 @@ export default function Auth() {
       <Card className="w-full max-w-md shadow-[var(--card-shadow)]">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-              <GraduationCap className="h-6 w-6 text-primary-foreground" />
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+              <CareervaLogo showText={false} iconClassName="h-10 w-10" />
             </div>
           </div>
           <CardTitle className="text-2xl">Welcome to Careerva</CardTitle>
