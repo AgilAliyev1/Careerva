@@ -105,6 +105,7 @@ export default function Courses() {
                 scheduledDate={course.scheduled_date}
                 durationMinutes={course.duration_minutes}
                 meetingLink={course.meeting_link}
+                detailHref={`/courses/${course.id}`}
               />
             ))}
           </div>

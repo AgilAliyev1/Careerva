@@ -112,7 +112,7 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleJoinClass = (courseId: string) => {
+  const handleLeaveFeedback = (courseId: string) => {
     setSelectedCourse(courseId);
     setFeedbackDialog(true);
   };
@@ -350,7 +350,9 @@ export default function StudentDashboard() {
                   scheduledDate={course.scheduled_date}
                   durationMinutes={course.duration_minutes}
                   meetingLink={course.meeting_link}
-                  onJoin={() => handleJoinClass(course.id)}
+                  detailHref={`/courses/${course.id}`}
+                  onSecondaryAction={() => handleLeaveFeedback(course.id)}
+                  secondaryActionLabel="Leave Feedback"
                 />
               ))}
             </div>
