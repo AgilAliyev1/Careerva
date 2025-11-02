@@ -1,0 +1,181 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Navbar } from "@/components/Navbar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Check } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { User } from "@supabase/supabase-js";
+
+const tiers = [
+  {
+    name: "Basic",
+    price: 10,
+    tier: "basic" as const,
+    features: [
+      "Access to 5 live courses per month",
+      "Course recordings available for 7 days",
+      "Basic community access",
+      "Email support",
+    ],
+  },
+  {
+    name: "Standard",
+    price: 20,
+    tier: "standard" as const,
+    features: [
+      "Access to 15 live courses per month",
+      "Course recordings available for 30 days",
+      "Full community access",
+      "Priority email support",
+      "Downloadable course materials",
+    ],
+    popular: true,
+  },
+  {
+    name: "Premium",
+    price: 30,
+    tier: "premium" as const,
+    features: [
+      "Unlimited access to all live courses",
+      "Lifetime access to course recordings",
+      "VIP community access",
+      "24/7 priority support",
+      "All course materials included",
+      "One-on-one mentorship session monthly",
+    ],
+  },
+];
+
+export default function Subscription() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSubscribe = async (tier: typeof tiers[0]) => {
+    if (!user) {
+      toast({
+        title: "Please sign in",
+        description: "You need to sign in to subscribe to a plan",
+      });
+      navigate("/auth");
+      return;
+    }
+
+    setLoading(tier.tier);
+
+    try {
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 1);
+
+      const { error } = await supabase.from("subscriptions").insert({
+        user_id: user.id,
+        tier: tier.tier,
+        price: tier.price,
+        status: "active",
+        end_date: endDate.toISOString(),
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Subscription successful!",
+        description: `You've subscribed to the ${tier.name} plan.`,
+      });
+
+      navigate("/student-dashboard");
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Subscription failed",
+        description: error.message,
+      });
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <div className="container mx-auto px-4 py-12">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold mb-4">Choose Your Plan</h1>
+          <p className="text-xl text-muted-foreground">
+            Select the perfect subscription tier for your learning journey
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          {tiers.map((tier) => (
+            <Card
+              key={tier.tier}
+              className={`relative ${
+                tier.popular
+                  ? "border-primary shadow-[var(--card-hover-shadow)] scale-105"
+                  : ""
+              }`}
+            >
+              {tier.popular && (
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                  <span className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-semibold">
+                    Most Popular
+                  </span>
+                </div>
+              )}
+              <CardHeader>
+                <CardTitle className="text-2xl">{tier.name}</CardTitle>
+                <CardDescription>
+                  <span className="text-4xl font-bold text-foreground">
+                    ${tier.price}
+                  </span>
+                  <span className="text-muted-foreground">/month</span>
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  {tier.features.map((feature, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span className="text-sm">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+              <CardFooter>
+                <Button
+                  className="w-full"
+                  variant={tier.popular ? "default" : "outline"}
+                  onClick={() => handleSubscribe(tier)}
+                  disabled={loading === tier.tier}
+                >
+                  {loading === tier.tier ? "Processing..." : "Subscribe Now"}
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+
+        <div className="text-center mt-12 text-sm text-muted-foreground">
+          <p>
+            * This is a demo payment system. No actual charges will be made.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
