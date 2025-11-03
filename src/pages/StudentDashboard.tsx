@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase, isUsingDemoSupabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
@@ -13,9 +13,14 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Flame, Star, TrendingUp, Clock3, Trophy, BookOpenCheck } from "lucide-react";
-import { User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
 import { format, formatDistanceToNowStrict } from "date-fns";
-import { demoCourses as demoCatalog, demoStudentProgress, DEMO_ACCOUNT_EMAIL } from "@/lib/demoData";
+import {
+  demoCourses as demoCatalog,
+  demoStudentProgress,
+  DEMO_ACCOUNT_EMAIL,
+  demoInstructorRatings,
+} from "@/lib/demoData";
 
 interface Course {
   id: string;
@@ -49,87 +54,29 @@ export default function StudentDashboard() {
   } | null>(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
-  const [accessStatus, setAccessStatus] = useState<{
-    state: "loading" | "trial" | "active" | "expired";
-    trialEndsAt?: string | null;
-  }>({ state: "loading", trialEndsAt: null });
-
-  const verifyAccess = useCallback(async (currentUser: User) => {
-    try {
-      const now = new Date();
-      const [{ data: profile, error: profileError }, { data: subscriptions, error: subscriptionError }] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("trial_ends_at, trial_status")
-          .eq("id", currentUser.id)
-          .single(),
-        supabase
-          .from("subscriptions")
-          .select("status, end_date")
-          .eq("user_id", currentUser.id)
-          .order("created_at", { ascending: false })
-          .limit(1),
-      ]);
-
-      if (profileError) throw profileError;
-      if (subscriptionError) throw subscriptionError;
-
-      const trialEndsAt = profile?.trial_ends_at ?? null;
-      const trialEndDate = trialEndsAt ? new Date(trialEndsAt) : null;
-      const hasActiveSubscription = (subscriptions ?? []).some((subscription) => {
-        if (!subscription) return false;
-        if (subscription.status === "active") return true;
-        if (subscription.status === "trialing") {
-          if (!subscription.end_date) return true;
-          return new Date(subscription.end_date) > now;
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [studentReputation, setStudentReputation] = useState<
+    | {
+        average: number;
+        totalReviews: number;
+        highlight?: string;
+      }
+    | null
+  >(
+    demoStudentProgress.reputation
+      ? {
+          average: demoStudentProgress.reputation.rating,
+          totalReviews: demoStudentProgress.reputation.totalReviews,
+          highlight: demoStudentProgress.reputation.highlight,
         }
-        return false;
-      });
-
-      if (hasActiveSubscription) {
-        setAccessStatus({ state: "active", trialEndsAt });
-        return true;
-      }
-
-      if (trialEndDate && trialEndDate >= now) {
-        setAccessStatus({ state: "trial", trialEndsAt });
-        return true;
-      }
-
-      setAccessStatus({ state: "expired", trialEndsAt });
-      toast({
-        variant: "destructive",
-        title: "Your trial has ended",
-        description: "Subscribe to continue attending live courses.",
-      });
-      navigate("/subscription");
-      return false;
-    } catch (error: any) {
-      console.error("verifyAccess", error);
-      toast({
-        variant: "destructive",
-        title: "We couldn't verify your access",
-        description: "Showing the demo classroom until we reconnect to Supabase.",
-      });
-      setAccessStatus({ state: "trial", trialEndsAt: null });
-      return true;
-    }
-  }, [navigate, toast]);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        navigate("/auth");
-        return;
-      }
-      setUser(session.user);
-      verifyAccess(session.user).then((canAccess) => {
-        if (canAccess) {
-          fetchCourses();
-        } else {
-          setLoading(false);
-        }
-      });
+      : null,
+  );
+  const [instructorRatings, setInstructorRatings] = useState<
+    Record<string, { average: number; count: number }>
+  >(() => {
+    const defaults: Record<string, { average: number; count: number }> = {};
+    Object.entries(demoInstructorRatings).forEach(([id, details]) => {
+      defaults[id] = { average: details.rating, count: details.totalReviews };
     });
     return defaults;
   });
@@ -139,23 +86,106 @@ export default function StudentDashboard() {
   }>({ state: "loading", trialEndsAt: null });
   const defaultReputationHighlight = demoStudentProgress.reputation?.highlight;
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_, session) => {
-      if (!session) {
-        navigate("/auth");
-        return;
-      }
-      setUser(session.user);
-      verifyAccess(session.user).then((canAccess) => {
-        if (canAccess) {
-          fetchCourses();
-        }
-      });
-    });
+  const loadStudentReputation = useCallback(
+    async (currentUser: User) => {
+      try {
+        const { data, error } = await supabase
+          .from("user_ratings")
+          .select("rating")
+          .eq("target_user_id", currentUser.id);
 
-    return () => subscription.unsubscribe();
-  }, [navigate, verifyAccess]);
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          const total = data.reduce((sum, item) => sum + (item?.rating ?? 0), 0);
+          const count = data.length;
+          setStudentReputation({
+            average: Number((total / count).toFixed(2)),
+            totalReviews: count,
+            highlight: defaultReputationHighlight,
+          });
+        } else if (isUsingDemoSupabase && demoStudentProgress.reputation) {
+          setStudentReputation({
+            average: demoStudentProgress.reputation.rating,
+            totalReviews: demoStudentProgress.reputation.totalReviews,
+            highlight: defaultReputationHighlight,
+          });
+        } else {
+          setStudentReputation(null);
+        }
+      } catch (error: any) {
+        console.warn("loadStudentReputation", error.message);
+        if (demoStudentProgress.reputation) {
+          setStudentReputation({
+            average: demoStudentProgress.reputation.rating,
+            totalReviews: demoStudentProgress.reputation.totalReviews,
+            highlight: defaultReputationHighlight,
+          });
+        }
+      }
+    },
+    [defaultReputationHighlight]
+  );
+
+  const hydrateInstructorRatings = useCallback(
+    async (instructorIds: string[]) => {
+      const unique = Array.from(new Set(instructorIds.filter(Boolean)));
+      if (unique.length === 0) return;
+
+      try {
+        const { data, error } = await supabase
+          .from("user_ratings")
+          .select("target_user_id, rating")
+          .in("target_user_id", unique);
+
+        if (error) throw error;
+
+        const aggregated: Record<string, { total: number; count: number }> = {};
+        (data || []).forEach((row) => {
+          if (!row || !row.target_user_id) return;
+          if (!aggregated[row.target_user_id]) {
+            aggregated[row.target_user_id] = { total: 0, count: 0 };
+          }
+          aggregated[row.target_user_id].total += row.rating ?? 0;
+          aggregated[row.target_user_id].count += 1;
+        });
+
+        setInstructorRatings((current) => {
+          const next = { ...current };
+          unique.forEach((id) => {
+            const stats = aggregated[id];
+            if (stats && stats.count > 0) {
+              next[id] = {
+                average: Number((stats.total / stats.count).toFixed(2)),
+                count: stats.count,
+              };
+            } else if (demoInstructorRatings[id]) {
+              next[id] = {
+                average: demoInstructorRatings[id].rating,
+                count: demoInstructorRatings[id].totalReviews,
+              };
+            }
+          });
+          return next;
+        });
+      } catch (error: any) {
+        console.warn("hydrateInstructorRatings", error.message);
+        setInstructorRatings((current) => {
+          const next = { ...current };
+          unique.forEach((id) => {
+            if (demoInstructorRatings[id]) {
+              next[id] = {
+                average: demoInstructorRatings[id].rating,
+                count: demoInstructorRatings[id].totalReviews,
+              };
+            }
+          });
+          return next;
+        });
+      }
+    },
+    []
+  );
 
   const verifyAccess = useCallback(async (currentUser: User) => {
     try {
@@ -386,6 +416,7 @@ export default function StudentDashboard() {
       ? formatDistanceToNowStrict(trialEndsAt)
       : formatDistanceToNowStrict(trialEndsAt, { addSuffix: true })
     : null;
+  const ratingChoices = useMemo(() => [1, 2, 3, 4, 5], []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -416,6 +447,30 @@ export default function StudentDashboard() {
               Your subscription is confirmed. {trialEndsAt && trialEndsAt < new Date() ? "Your initial trial has ended." : "Enjoy uninterrupted learning."}
             </AlertDescription>
           </Alert>
+        )}
+
+        {studentReputation && (
+          <Card className="mb-8">
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <CardTitle className="flex items-center gap-2 text-2xl">
+                  <Star className="h-5 w-5 text-primary fill-primary" />
+                  Your cohort rating
+                </CardTitle>
+                <CardDescription>
+                  Based on {studentReputation.totalReviews} instructor reviews
+                </CardDescription>
+              </div>
+              <div className="text-4xl font-bold text-primary">
+                {studentReputation.average.toFixed(2)}
+              </div>
+            </CardHeader>
+            {studentReputation.highlight && (
+              <CardContent>
+                <p className="text-sm text-muted-foreground">{studentReputation.highlight}</p>
+              </CardContent>
+            )}
+          </Card>
         )}
 
         {isDemoUser && (

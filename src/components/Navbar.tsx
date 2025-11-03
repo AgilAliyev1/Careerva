@@ -71,6 +71,12 @@ export const Navbar = () => {
             <Link to="/contact" className="text-sm font-medium hover:text-primary transition-colors">
               Contact
             </Link>
+            <Link to="/mentors" className="text-sm font-medium hover:text-primary transition-colors">
+              Mentors
+            </Link>
+            <Link to="/forum" className="text-sm font-medium hover:text-primary transition-colors">
+              Forum
+            </Link>
             {user && userRole === "student" && (
               <Link to="/student-dashboard" className="text-sm font-medium hover:text-primary transition-colors">
                 Dashboard

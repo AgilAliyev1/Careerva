@@ -7,49 +7,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
 import { formatDistanceToNowStrict } from "date-fns";
-
-const tiers = [
-  {
-    name: "Starter",
-    price: 30,
-    tier: "starter" as const,
-    coursesPerMonth: 3,
-    features: [
-      "Access to any 3 live courses every month",
-      "Downloadable class resources",
-      "Standard community access",
-      "Email support",
-    ],
-  },
-  {
-    name: "Growth",
-    price: 50,
-    tier: "growth" as const,
-    coursesPerMonth: 5,
-    features: [
-      "Join 5 premium live courses every month",
-      "Course recordings saved for 30 days",
-      "Priority seat reservations",
-      "Mentor-led study group",
-    ],
-    popular: true,
-  },
-  {
-    name: "Unlimited",
-    price: 100,
-    tier: "unlimited" as const,
-    coursesPerMonth: null,
-    features: [
-      "Unlimited live course access",
-      "Lifetime access to recordings",
-      "VIP community channels",
-      "1:1 career coaching session each month",
-      "24/7 priority support",
-    ],
-  },
-];
+import { planList, SubscriptionPlan } from "@/lib/subscriptionPlans";
 
 export default function Subscription() {
   const navigate = useNavigate();
@@ -71,6 +31,32 @@ export default function Subscription() {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user) {
+        setTrialEndsAt(null);
+        setTrialStatus(null);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("trial_ends_at, trial_status")
+        .eq("id", user.id)
+        .single();
+
+      if (error) {
+        console.error("loadProfile", error);
+        return;
+      }
+
+      setTrialEndsAt(data?.trial_ends_at ?? null);
+      setTrialStatus(data?.trial_status ?? null);
+    };
+
+    loadProfile();
+  }, [user]);
+
   const checkoutLinks = useMemo(
     () => ({
       starter: import.meta.env.VITE_PADDLE_STARTER_CHECKOUT_URL,
@@ -80,7 +66,16 @@ export default function Subscription() {
     []
   );
 
-  const handleSubscribe = async (tier: typeof tiers[0]) => {
+  const trialEndDate = trialEndsAt ? new Date(trialEndsAt) : null;
+  const now = new Date();
+  const isTrialActive = !!(trialEndDate && trialEndDate >= now);
+  const trialMessage = trialEndDate
+    ? isTrialActive
+      ? formatDistanceToNowStrict(trialEndDate)
+      : formatDistanceToNowStrict(trialEndDate, { addSuffix: true })
+    : null;
+
+  const handleSubscribe = async (tier: SubscriptionPlan) => {
     if (!user) {
       toast({
         title: "Please sign in",
@@ -99,6 +94,10 @@ export default function Subscription() {
         throw new Error(
           "No checkout link configured for this plan. Please contact support."
         );
+      }
+
+      if (!user.email_confirmed_at) {
+        throw new Error("Please verify your email address before subscribing.");
       }
 
       const redirectUrl = new URL(checkoutUrl);
