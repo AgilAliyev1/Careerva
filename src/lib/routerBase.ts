@@ -22,6 +22,10 @@ export const getRouterBasename = (): string => {
     /\/$/,
     "",
   );
+  const sanitized = normalized === "/" ? "" : normalized;
+
+  if (sanitized || !window.location.hostname.endsWith("github.io")) {
+    cachedBasename = sanitized;
 
   if (normalized || !window.location.hostname.endsWith("github.io")) {
     cachedBasename = normalized;
