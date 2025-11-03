@@ -19,6 +19,26 @@
   </head>
 
   <body>
+    <script>
+      (function () {
+        var l = window.location;
+        var segments = l.pathname.split("/").filter(Boolean);
+        if (!window.__APP_BASE_PATH__ && l.hostname.endsWith("github.io")) {
+          window.__APP_BASE_PATH__ = segments.length ? "/" + segments[0] : "";
+        }
+
+        if (!l.search || l.search.indexOf("?/") !== 0) {
+          return;
+        }
+
+        var parts = l.search.slice(2).split("&");
+        var path = parts.shift() || "";
+        var query = parts.length ? "?" + parts.join("&") : "";
+        var base = (window.__APP_BASE_PATH__ || "").replace(/\/$/, "");
+        var newPath = (base || "/") + (path ? "/" + path : "");
+        window.history.replaceState(null, "", newPath + query + l.hash);
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

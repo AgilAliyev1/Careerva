@@ -12,8 +12,10 @@ import Courses from "./pages/Courses";
 import CourseDetail from "./pages/CourseDetail";
 import About from "./pages/About";
 import NotFound from "./pages/NotFound";
+import { getRouterBasename } from "./lib/routerBase";
 
 const queryClient = new QueryClient();
+const basename = getRouterBasename();
 
 const basename = new URL(
   import.meta.env.BASE_URL,
