@@ -26,9 +26,6 @@ export const getRouterBasename = (): string => {
 
   if (sanitized || !window.location.hostname.endsWith("github.io")) {
     cachedBasename = sanitized;
-
-  if (normalized || !window.location.hostname.endsWith("github.io")) {
-    cachedBasename = normalized;
     return cachedBasename;
   }
 
