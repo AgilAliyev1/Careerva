@@ -68,6 +68,9 @@ export const Navbar = () => {
             <Link to="/about" className="text-sm font-medium hover:text-primary transition-colors">
               About
             </Link>
+            <Link to="/contact" className="text-sm font-medium hover:text-primary transition-colors">
+              Contact
+            </Link>
             {user && userRole === "student" && (
               <Link to="/student-dashboard" className="text-sm font-medium hover:text-primary transition-colors">
                 Dashboard

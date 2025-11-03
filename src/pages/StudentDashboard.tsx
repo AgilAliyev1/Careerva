@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
@@ -10,10 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Flame, Star, TrendingUp, Clock3, Trophy, BookOpenCheck } from "lucide-react";
 import { User } from "@supabase/supabase-js";
-import { format } from "date-fns";
+import { format, formatDistanceToNowStrict } from "date-fns";
 import { demoCourses as demoCatalog, demoStudentProgress, DEMO_ACCOUNT_EMAIL } from "@/lib/demoData";
 
 interface Course {
@@ -44,6 +45,72 @@ export default function StudentDashboard() {
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
+  const [accessStatus, setAccessStatus] = useState<{
+    state: "loading" | "trial" | "active" | "expired";
+    trialEndsAt?: string | null;
+  }>({ state: "loading", trialEndsAt: null });
+
+  const verifyAccess = useCallback(async (currentUser: User) => {
+    try {
+      const now = new Date();
+      const [{ data: profile, error: profileError }, { data: subscriptions, error: subscriptionError }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("trial_ends_at, trial_status")
+          .eq("id", currentUser.id)
+          .single(),
+        supabase
+          .from("subscriptions")
+          .select("status, end_date")
+          .eq("user_id", currentUser.id)
+          .order("created_at", { ascending: false })
+          .limit(1),
+      ]);
+
+      if (profileError) throw profileError;
+      if (subscriptionError) throw subscriptionError;
+
+      const trialEndsAt = profile?.trial_ends_at ?? null;
+      const trialEndDate = trialEndsAt ? new Date(trialEndsAt) : null;
+      const hasActiveSubscription = (subscriptions ?? []).some((subscription) => {
+        if (!subscription) return false;
+        if (subscription.status === "active") return true;
+        if (subscription.status === "trialing") {
+          if (!subscription.end_date) return true;
+          return new Date(subscription.end_date) > now;
+        }
+        return false;
+      });
+
+      if (hasActiveSubscription) {
+        setAccessStatus({ state: "active", trialEndsAt });
+        return true;
+      }
+
+      if (trialEndDate && trialEndDate >= now) {
+        setAccessStatus({ state: "trial", trialEndsAt });
+        return true;
+      }
+
+      setAccessStatus({ state: "expired", trialEndsAt });
+      toast({
+        variant: "destructive",
+        title: "Your trial has ended",
+        description: "Subscribe to continue attending live courses.",
+      });
+      navigate("/subscription");
+      return false;
+    } catch (error: any) {
+      console.error("verifyAccess", error);
+      toast({
+        variant: "destructive",
+        title: "We couldn't verify your access",
+        description: "Showing the demo classroom until we reconnect to Supabase.",
+      });
+      setAccessStatus({ state: "trial", trialEndsAt: null });
+      return true;
+    }
+  }, [navigate, toast]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -52,7 +119,13 @@ export default function StudentDashboard() {
         return;
       }
       setUser(session.user);
-      fetchCourses();
+      verifyAccess(session.user).then((canAccess) => {
+        if (canAccess) {
+          fetchCourses();
+        } else {
+          setLoading(false);
+        }
+      });
     });
 
     const {
@@ -60,11 +133,18 @@ export default function StudentDashboard() {
     } = supabase.auth.onAuthStateChange((_, session) => {
       if (!session) {
         navigate("/auth");
+        return;
       }
+      setUser(session.user);
+      verifyAccess(session.user).then((canAccess) => {
+        if (canAccess) {
+          fetchCourses();
+        }
+      });
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, verifyAccess]);
 
   const fetchCourses = async () => {
     try {
@@ -155,6 +235,14 @@ export default function StudentDashboard() {
   const assessments = progress.assessments;
   const achievements = progress.achievements;
   const upcoming = progress.upcoming;
+  const trialEndsAt = accessStatus.trialEndsAt ? new Date(accessStatus.trialEndsAt) : null;
+  const now = new Date();
+  const isTrialActive = !!(trialEndsAt && trialEndsAt >= now);
+  const trialMessage = trialEndsAt
+    ? isTrialActive
+      ? formatDistanceToNowStrict(trialEndsAt)
+      : formatDistanceToNowStrict(trialEndsAt, { addSuffix: true })
+    : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -168,6 +256,24 @@ export default function StudentDashboard() {
               : "Browse and join available live courses"}
           </p>
         </div>
+
+        {accessStatus.state === "trial" && trialMessage && (
+          <Alert className="mb-8">
+            <AlertTitle>Your free trial is active</AlertTitle>
+            <AlertDescription>
+              You have {trialMessage} remaining in your free trial. Subscribe anytime to avoid losing access.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {accessStatus.state === "active" && (
+          <Alert className="mb-8" variant="default">
+            <AlertTitle>Subscription active</AlertTitle>
+            <AlertDescription>
+              Your subscription is confirmed. {trialEndsAt && trialEndsAt < new Date() ? "Your initial trial has ended." : "Enjoy uninterrupted learning."}
+            </AlertDescription>
+          </Alert>
+        )}
 
         {isDemoUser && (
           <div className="space-y-8 mb-10">

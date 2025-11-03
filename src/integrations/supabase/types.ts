@@ -113,6 +113,9 @@ export type Database = {
           full_name: string
           id: string
           role: Database["public"]["Enums"]["user_role"]
+          trial_ends_at: string
+          trial_started_at: string
+          trial_status: string
           updated_at: string
         }
         Insert: {
@@ -121,6 +124,9 @@ export type Database = {
           full_name: string
           id: string
           role?: Database["public"]["Enums"]["user_role"]
+          trial_ends_at?: string
+          trial_started_at?: string
+          trial_status?: string
           updated_at?: string
         }
         Update: {
@@ -129,6 +135,9 @@ export type Database = {
           full_name?: string
           id?: string
           role?: Database["public"]["Enums"]["user_role"]
+          trial_ends_at?: string
+          trial_started_at?: string
+          trial_status?: string
           updated_at?: string
         }
         Relationships: []
