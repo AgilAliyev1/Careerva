@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
@@ -67,6 +67,15 @@ export default function Subscription() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const checkoutLinks = useMemo(
+    () => ({
+      starter: import.meta.env.VITE_PADDLE_STARTER_CHECKOUT_URL,
+      growth: import.meta.env.VITE_PADDLE_GROWTH_CHECKOUT_URL,
+      unlimited: import.meta.env.VITE_PADDLE_UNLIMITED_CHECKOUT_URL,
+    }),
+    []
+  );
+
   const handleSubscribe = async (tier: typeof tiers[0]) => {
     if (!user) {
       toast({
@@ -80,25 +89,25 @@ export default function Subscription() {
     setLoading(tier.tier);
 
     try {
-      const endDate = new Date();
-      endDate.setMonth(endDate.getMonth() + 1);
+      const checkoutUrl = checkoutLinks[tier.tier];
 
-      const { error } = await supabase.from("subscriptions").insert({
-        user_id: user.id,
-        tier: tier.tier,
-        price: tier.price,
-        status: "active",
-        end_date: endDate.toISOString(),
-      });
+      if (!checkoutUrl) {
+        throw new Error(
+          "No checkout link configured for this plan. Please contact support."
+        );
+      }
 
-      if (error) throw error;
+      const redirectUrl = new URL(checkoutUrl);
+      if (user.email) {
+        redirectUrl.searchParams.set("customer_email", user.email);
+      }
 
       toast({
-        title: "Subscription successful!",
-        description: `You've subscribed to the ${tier.name} plan.`,
+        title: "Redirecting to secure checkout",
+        description: "You will be able to complete your payment on the next page.",
       });
 
-      navigate("/student-dashboard");
+      window.location.href = redirectUrl.toString();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -177,9 +186,7 @@ export default function Subscription() {
         </div>
 
         <div className="text-center mt-12 text-sm text-muted-foreground">
-          <p>
-            * This is a demo payment system. No actual charges will be made.
-          </p>
+          <p>Payments are securely processed by Paddle.</p>
         </div>
       </div>
     </div>
