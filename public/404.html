@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Careerva</title>
+    <script>
+      (function () {
+        var l = window.location;
+        var isProjectPage = l.hostname.endsWith("github.io");
+        var segments = l.pathname.replace(/^\/+/, "").split("/").filter(Boolean);
+
+        var globalBase = window.__APP_BASE_PATH__ || "";
+        var base = globalBase;
+        if (!base && isProjectPage && segments.length) {
+          base = "/" + segments[0];
+        }
+
+        var baseName = base.replace(/^\//, "");
+        var remainder = segments;
+        if (baseName && remainder[0] === baseName) {
+          remainder = remainder.slice(1);
+        }
+
+        var redirectPath = remainder.join("/");
+        var search = l.search ? l.search.replace(/^\?/, "&") : "";
+        var query = redirectPath ? "?\/" + redirectPath : "?\/";
+        var newUrl = (base || "") + "/" + query + search + l.hash;
+
+        l.replace(newUrl.replace(/\/{2,}/g, "/"));
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>

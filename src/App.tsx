@@ -9,17 +9,20 @@ import StudentDashboard from "./pages/StudentDashboard";
 import InstructorDashboard from "./pages/InstructorDashboard";
 import Subscription from "./pages/Subscription";
 import Courses from "./pages/Courses";
+import CourseDetail from "./pages/CourseDetail";
 import About from "./pages/About";
 import NotFound from "./pages/NotFound";
+import { getRouterBasename } from "./lib/routerBase";
 
 const queryClient = new QueryClient();
+const basename = getRouterBasename();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter basename={basename}>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
@@ -27,6 +30,7 @@ const App = () => (
           <Route path="/instructor-dashboard" element={<InstructorDashboard />} />
           <Route path="/subscription" element={<Subscription />} />
           <Route path="/courses" element={<Courses />} />
+          <Route path="/courses/:courseId" element={<CourseDetail />} />
           <Route path="/about" element={<About />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
