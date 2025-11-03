@@ -3,26 +3,15 @@ import { Navbar } from "@/components/Navbar";
 import { CourseCard } from "@/components/CourseCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { demoCourses as demoCatalog, DemoCourse } from "@/lib/demoData";
 
-interface Course {
-  id: string;
-  title: string;
-  description: string | null;
-  category: string;
-  instructor_id: string;
-  scheduled_date: string;
-  duration_minutes: number;
-  meeting_link: string;
-  profiles: {
-    full_name: string;
-  };
-}
+type Course = DemoCourse;
 
 export default function Courses() {
   const { toast } = useToast();
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [courses, setCourses] = useState<Course[]>(demoCatalog);
+  const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
 
   useEffect(() => {
@@ -30,6 +19,7 @@ export default function Courses() {
   }, []);
 
   const fetchCourses = async () => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from("courses")
@@ -42,13 +32,27 @@ export default function Courses() {
         .order("scheduled_date", { ascending: true });
 
       if (error) throw error;
-      setCourses(data || []);
+
+      const supabaseCourses = (data || []).map((course) => ({
+        ...course,
+        description: course.description ?? "",
+        profiles: course.profiles || { full_name: "Careerva Instructor" },
+      }));
+
+      const combinedCourses = [...demoCatalog];
+      supabaseCourses.forEach((course) => {
+        if (!combinedCourses.find((demo) => demo.id === course.id)) {
+          combinedCourses.push(course);
+        }
+      });
+
+      setCourses(combinedCourses);
     } catch (error: any) {
       toast({
-        variant: "destructive",
-        title: "Error loading courses",
-        description: error.message,
+        title: "Showing demo catalog",
+        description: "We're displaying our curated demo courses while live data loads.",
       });
+      setCourses(demoCatalog);
     } finally {
       setLoading(false);
     }
@@ -82,7 +86,7 @@ export default function Courses() {
           </TabsList>
         </Tabs>
 
-        {loading ? (
+        {loading && courses.length === 0 ? (
           <div className="text-center py-12">Loading courses...</div>
         ) : filteredCourses.length === 0 ? (
           <div className="text-center py-12">
@@ -101,6 +105,7 @@ export default function Courses() {
                 scheduledDate={course.scheduled_date}
                 durationMinutes={course.duration_minutes}
                 meetingLink={course.meeting_link}
+                detailHref={`/courses/${course.id}`}
               />
             ))}
           </div>
