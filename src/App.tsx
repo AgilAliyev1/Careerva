@@ -17,6 +17,12 @@ import { getRouterBasename } from "./lib/routerBase";
 const queryClient = new QueryClient();
 const basename = getRouterBasename();
 
+const basename = new URL(
+  import.meta.env.BASE_URL,
+  window.location.origin,
+)
+  .pathname.replace(/\/$/, "");
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
