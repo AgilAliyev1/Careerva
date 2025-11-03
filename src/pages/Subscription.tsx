@@ -10,40 +10,41 @@ import { User } from "@supabase/supabase-js";
 
 const tiers = [
   {
-    name: "Basic",
-    price: 10,
-    tier: "basic" as const,
+    name: "Starter",
+    price: 30,
+    tier: "starter" as const,
+    coursesPerMonth: 3,
     features: [
-      "Access to 5 live courses per month",
-      "Course recordings available for 7 days",
-      "Basic community access",
+      "Access to any 3 live courses every month",
+      "Downloadable class resources",
+      "Standard community access",
       "Email support",
     ],
   },
   {
-    name: "Standard",
-    price: 20,
-    tier: "standard" as const,
+    name: "Growth",
+    price: 50,
+    tier: "growth" as const,
+    coursesPerMonth: 5,
     features: [
-      "Access to 15 live courses per month",
-      "Course recordings available for 30 days",
-      "Full community access",
-      "Priority email support",
-      "Downloadable course materials",
+      "Join 5 premium live courses every month",
+      "Course recordings saved for 30 days",
+      "Priority seat reservations",
+      "Mentor-led study group",
     ],
     popular: true,
   },
   {
-    name: "Premium",
-    price: 30,
-    tier: "premium" as const,
+    name: "Unlimited",
+    price: 100,
+    tier: "unlimited" as const,
+    coursesPerMonth: null,
     features: [
-      "Unlimited access to all live courses",
-      "Lifetime access to course recordings",
-      "VIP community access",
+      "Unlimited live course access",
+      "Lifetime access to recordings",
+      "VIP community channels",
+      "1:1 career coaching session each month",
       "24/7 priority support",
-      "All course materials included",
-      "One-on-one mentorship session monthly",
     ],
   },
 ];
@@ -145,6 +146,11 @@ export default function Subscription() {
                   </span>
                   <span className="text-muted-foreground">/month</span>
                 </CardDescription>
+                <p className="text-sm font-medium text-primary">
+                  {tier.coursesPerMonth
+                    ? `${tier.coursesPerMonth} curated courses every month`
+                    : "Unlimited courses every month"}
+                </p>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-3">

@@ -1,8 +1,9 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, User, ExternalLink } from "lucide-react";
+import { Calendar, Clock, User, ExternalLink, Info } from "lucide-react";
 import { format } from "date-fns";
+import { Link } from "react-router-dom";
 
 interface CourseCardProps {
   id: string;
@@ -12,10 +13,14 @@ interface CourseCardProps {
   instructorName: string;
   scheduledDate: string;
   durationMinutes: number;
-  meetingLink: string;
+  meetingLink?: string;
+  detailHref?: string;
+  detailLabel?: string;
   onJoin?: () => void;
   onEdit?: () => void;
   isInstructor?: boolean;
+  onSecondaryAction?: () => void;
+  secondaryActionLabel?: string;
 }
 
 export const CourseCard = ({
@@ -26,9 +31,13 @@ export const CourseCard = ({
   scheduledDate,
   durationMinutes,
   meetingLink,
+  detailHref,
+  detailLabel = "View details",
   onJoin,
   onEdit,
   isInstructor = false,
+  onSecondaryAction,
+  secondaryActionLabel,
 }: CourseCardProps) => {
   const categoryColors: Record<string, string> = {
     Programming: "bg-blue-500/10 text-blue-700 border-blue-200",
@@ -69,16 +78,30 @@ export const CourseCard = ({
           <Button onClick={onEdit} variant="outline" className="w-full">
             Edit Course
           </Button>
+        ) : detailHref ? (
+          <Button asChild className="w-full">
+            <Link to={detailHref} onClick={onJoin}>
+              <Info className="h-4 w-4" />
+              <span>{detailLabel}</span>
+            </Link>
+          </Button>
         ) : (
           <Button
             onClick={() => {
-              window.open(meetingLink, "_blank");
+              if (meetingLink) {
+                window.open(meetingLink, "_blank");
+              }
               onJoin?.();
             }}
             className="w-full"
           >
             <ExternalLink className="h-4 w-4 mr-2" />
             Join Class
+          </Button>
+        )}
+        {!isInstructor && onSecondaryAction && secondaryActionLabel && (
+          <Button onClick={onSecondaryAction} variant="outline" className="w-full">
+            {secondaryActionLabel}
           </Button>
         )}
       </CardFooter>
