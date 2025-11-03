@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, User, ExternalLink, Info } from "lucide-react";
+import { Calendar, Clock, User, ExternalLink, Info, Star } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "react-router-dom";
 
@@ -21,6 +21,8 @@ interface CourseCardProps {
   isInstructor?: boolean;
   onSecondaryAction?: () => void;
   secondaryActionLabel?: string;
+  ratingAverage?: number | null;
+  ratingCount?: number | null;
 }
 
 export const CourseCard = ({
@@ -38,6 +40,8 @@ export const CourseCard = ({
   isInstructor = false,
   onSecondaryAction,
   secondaryActionLabel,
+  ratingAverage,
+  ratingCount,
 }: CourseCardProps) => {
   const categoryColors: Record<string, string> = {
     Programming: "bg-blue-500/10 text-blue-700 border-blue-200",
@@ -72,6 +76,15 @@ export const CourseCard = ({
             {format(new Date(scheduledDate), "p")} ({durationMinutes} min)
           </span>
         </div>
+        {typeof ratingAverage === "number" && ratingAverage > 0 && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Star className="h-4 w-4 text-primary fill-primary" />
+            <span>
+              {ratingAverage.toFixed(2)}
+              {typeof ratingCount === "number" ? ` (${ratingCount} reviews)` : ""}
+            </span>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="flex gap-2">
         {isInstructor ? (

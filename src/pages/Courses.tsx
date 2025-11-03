@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { CourseCard } from "@/components/CourseCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { demoCourses as demoCatalog, DemoCourse } from "@/lib/demoData";
+import { demoCourses as demoCatalog, DemoCourse, demoInstructorRatings } from "@/lib/demoData";
 
 type Course = DemoCourse;
 
@@ -13,12 +13,62 @@ export default function Courses() {
   const [courses, setCourses] = useState<Course[]>(demoCatalog);
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [instructorRatings, setInstructorRatings] = useState<
+    Record<string, { average: number; count: number }>
+  >(() => {
+    const defaults: Record<string, { average: number; count: number }> = {};
+    Object.entries(demoInstructorRatings).forEach(([id, details]) => {
+      defaults[id] = { average: details.rating, count: details.totalReviews };
+    });
+    return defaults;
+  });
 
-  useEffect(() => {
-    fetchCourses();
+  const hydrateInstructorRatings = useCallback(async (instructorIds: string[]) => {
+    const unique = Array.from(new Set(instructorIds.filter(Boolean)));
+    if (unique.length === 0) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("user_ratings")
+        .select("target_user_id, rating")
+        .in("target_user_id", unique);
+
+      if (error) throw error;
+
+      const aggregated: Record<string, { total: number; count: number }> = {};
+      (data || []).forEach((row) => {
+        if (!row || !row.target_user_id) return;
+        if (!aggregated[row.target_user_id]) {
+          aggregated[row.target_user_id] = { total: 0, count: 0 };
+        }
+        aggregated[row.target_user_id].total += row.rating ?? 0;
+        aggregated[row.target_user_id].count += 1;
+      });
+
+      setInstructorRatings((current) => {
+        const next = { ...current };
+        unique.forEach((id) => {
+          const stats = aggregated[id];
+          if (stats && stats.count > 0) {
+            next[id] = {
+              average: Number((stats.total / stats.count).toFixed(2)),
+              count: stats.count,
+            };
+          } else if (demoInstructorRatings[id]) {
+            next[id] = {
+              average: demoInstructorRatings[id].rating,
+              count: demoInstructorRatings[id].totalReviews,
+            };
+          }
+        });
+        return next;
+      });
+    } catch (error: any) {
+      console.warn("hydrateInstructorRatings", error.message);
+    }
   }, []);
 
-  const fetchCourses = async () => {
+  const fetchCourses = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -47,16 +97,22 @@ export default function Courses() {
       });
 
       setCourses(combinedCourses);
+      await hydrateInstructorRatings(combinedCourses.map((course) => course.instructor_id));
     } catch (error: any) {
       toast({
         title: "Showing demo catalog",
         description: "We're displaying our curated demo courses while live data loads.",
       });
       setCourses(demoCatalog);
+      await hydrateInstructorRatings(demoCatalog.map((course) => course.instructor_id));
     } finally {
       setLoading(false);
     }
-  };
+  }, [hydrateInstructorRatings, toast]);
+
+  useEffect(() => {
+    fetchCourses();
+  }, [fetchCourses]);
 
   const categories = ["all", "Programming", "Design", "Business", "Languages"];
 
@@ -106,6 +162,8 @@ export default function Courses() {
                 durationMinutes={course.duration_minutes}
                 meetingLink={course.meeting_link}
                 detailHref={`/courses/${course.id}`}
+                ratingAverage={instructorRatings[course.instructor_id]?.average ?? null}
+                ratingCount={instructorRatings[course.instructor_id]?.count ?? null}
               />
             ))}
           </div>

@@ -170,16 +170,18 @@ export default function Subscription() {
         </div>
 
         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {tiers.map((tier) => (
-            <Card
-              key={tier.tier}
+          {planList.map((tier) => {
+            const isPopular = tier.tier === "growth";
+            return (
+              <Card
+                key={tier.tier}
               className={`relative ${
-                tier.popular
+                isPopular
                   ? "border-primary shadow-[var(--card-hover-shadow)] scale-105"
                   : ""
               }`}
             >
-              {tier.popular && (
+              {isPopular && (
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                   <span className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-semibold">
                     Most Popular
@@ -194,6 +196,9 @@ export default function Subscription() {
                   </span>
                   <span className="text-muted-foreground">/month</span>
                 </CardDescription>
+                {tier.highlight && (
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">{tier.highlight}</p>
+                )}
                 <p className="text-sm font-medium text-primary">
                   {tier.coursesPerMonth
                     ? `${tier.coursesPerMonth} curated courses every month`
@@ -213,15 +218,16 @@ export default function Subscription() {
               <CardFooter>
                 <Button
                   className="w-full"
-                  variant={tier.popular ? "default" : "outline"}
+                  variant={isPopular ? "default" : "outline"}
                   onClick={() => handleSubscribe(tier)}
                   disabled={loading === tier.tier}
                 >
                   {loading === tier.tier ? "Processing..." : "Subscribe Now"}
                 </Button>
               </CardFooter>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
 
         <div className="text-center mt-12 text-sm text-muted-foreground">

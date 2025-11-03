@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, isUsingDemoSupabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { CourseCard } from "@/components/CourseCard";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +42,11 @@ export default function StudentDashboard() {
   );
   const [loading, setLoading] = useState(true);
   const [feedbackDialog, setFeedbackDialog] = useState(false);
-  const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<{
+    id: string;
+    instructorId?: string;
+    title?: string;
+  } | null>(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [accessStatus, setAccessStatus] = useState<{
@@ -127,6 +131,13 @@ export default function StudentDashboard() {
         }
       });
     });
+    return defaults;
+  });
+  const [accessStatus, setAccessStatus] = useState<{
+    state: "loading" | "trial" | "active" | "expired";
+    trialEndsAt?: string | null;
+  }>({ state: "loading", trialEndsAt: null });
+  const defaultReputationHighlight = demoStudentProgress.reputation?.highlight;
 
     const {
       data: { subscription },
@@ -146,7 +157,69 @@ export default function StudentDashboard() {
     return () => subscription.unsubscribe();
   }, [navigate, verifyAccess]);
 
-  const fetchCourses = async () => {
+  const verifyAccess = useCallback(async (currentUser: User) => {
+    try {
+      const now = new Date();
+      const [{ data: profile, error: profileError }, { data: subscriptions, error: subscriptionError }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("trial_ends_at, trial_status")
+          .eq("id", currentUser.id)
+          .single(),
+        supabase
+          .from("subscriptions")
+          .select("status, end_date")
+          .eq("user_id", currentUser.id)
+          .order("created_at", { ascending: false })
+          .limit(1),
+      ]);
+
+      if (profileError) throw profileError;
+      if (subscriptionError) throw subscriptionError;
+
+      const trialEndsAt = profile?.trial_ends_at ?? null;
+      const trialEndDate = trialEndsAt ? new Date(trialEndsAt) : null;
+      const hasActiveSubscription = (subscriptions ?? []).some((subscription) => {
+        if (!subscription) return false;
+        if (subscription.status === "active") return true;
+        if (subscription.status === "trialing") {
+          if (!subscription.end_date) return true;
+          return new Date(subscription.end_date) > now;
+        }
+        return false;
+      });
+
+      if (hasActiveSubscription) {
+        setAccessStatus({ state: "active", trialEndsAt });
+        return true;
+      }
+
+      if (trialEndDate && trialEndDate >= now) {
+        setAccessStatus({ state: "trial", trialEndsAt });
+        return true;
+      }
+
+      setAccessStatus({ state: "expired", trialEndsAt });
+      toast({
+        variant: "destructive",
+        title: "Your trial has ended",
+        description: "Subscribe to continue attending live courses.",
+      });
+      navigate("/subscription");
+      return false;
+    } catch (error: any) {
+      console.error("verifyAccess", error);
+      toast({
+        variant: "destructive",
+        title: "We couldn't verify your access",
+        description: "Showing the demo classroom until we reconnect to Supabase.",
+      });
+      setAccessStatus({ state: "trial", trialEndsAt: null });
+      return true;
+    }
+  }, [navigate, toast]);
+
+  const fetchCourses = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("courses")
@@ -177,39 +250,113 @@ export default function StudentDashboard() {
       });
 
       setCourses(combinedCourses);
+      await hydrateInstructorRatings(combinedCourses.map((course) => course.instructor_id));
     } catch (error: any) {
       toast({
         title: "Showing demo classroom",
         description: "You're viewing the curated pitch deck schedule while we connect to live data.",
       });
-      setCourses(
-        demoCatalog.map((course) => ({
-          ...course,
-        }))
-      );
+      const fallbackCourses = demoCatalog.map((course) => ({
+        ...course,
+      }));
+      setCourses(fallbackCourses);
+      await hydrateInstructorRatings(fallbackCourses.map((course) => course.instructor_id));
     } finally {
       setLoading(false);
     }
-  };
+  }, [hydrateInstructorRatings, toast]);
 
-  const handleLeaveFeedback = (courseId: string) => {
-    setSelectedCourse(courseId);
+  const handleLeaveFeedback = (courseId: string, instructorId?: string, title?: string) => {
+    setSelectedCourse({ id: courseId, instructorId, title });
     setFeedbackDialog(true);
   };
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate("/auth");
+        return;
+      }
+      setUser(session.user);
+      verifyAccess(session.user).then((canAccess) => {
+        if (canAccess) {
+          fetchCourses();
+          loadStudentReputation(session.user);
+        } else {
+          setLoading(false);
+        }
+      });
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_, session) => {
+      if (!session) {
+        navigate("/auth");
+        return;
+      }
+      setUser(session.user);
+      verifyAccess(session.user).then((canAccess) => {
+        if (canAccess) {
+          fetchCourses();
+          loadStudentReputation(session.user);
+        }
+      });
+    });
+
+    return () => subscription.unsubscribe();
+  }, [fetchCourses, loadStudentReputation, navigate, verifyAccess]);
 
   const handleSubmitFeedback = async () => {
     if (!selectedCourse || !user) return;
 
+    setFeedbackSubmitting(true);
+    let saved = false;
+
     try {
       const { error } = await supabase.from("feedback").insert({
-        course_id: selectedCourse,
+        course_id: selectedCourse.id,
         student_id: user.id,
         rating,
         comment,
       });
 
-      if (error) throw error;
+      if (error && !isUsingDemoSupabase) {
+        throw error;
+      }
 
+      if (selectedCourse.instructorId) {
+        const { error: ratingError } = await supabase.from("user_ratings").insert({
+          target_user_id: selectedCourse.instructorId,
+          reviewer_user_id: user.id,
+          rating,
+          comment,
+          target_role: "instructor",
+        } as any);
+
+        if (ratingError && !isUsingDemoSupabase) {
+          throw ratingError;
+        }
+
+        await hydrateInstructorRatings([selectedCourse.instructorId]);
+      }
+
+      saved = true;
+    } catch (error: any) {
+      if (!isUsingDemoSupabase) {
+        toast({
+          variant: "destructive",
+          title: "Error submitting feedback",
+          description: error.message,
+        });
+        setFeedbackSubmitting(false);
+        return;
+      }
+      console.warn("handleSubmitFeedback", error.message);
+      saved = true;
+    }
+
+    if (saved) {
       toast({
         title: "Feedback submitted!",
         description: "Thank you for your feedback.",
@@ -219,13 +366,9 @@ export default function StudentDashboard() {
       setComment("");
       setRating(5);
       setSelectedCourse(null);
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error submitting feedback",
-        description: error.message,
-      });
     }
+
+    setFeedbackSubmitting(false);
   };
 
   const isDemoUser = user?.email?.toLowerCase() === DEMO_ACCOUNT_EMAIL;
@@ -352,6 +495,31 @@ export default function StudentDashboard() {
                           </Badge>
                         ))}
                       </div>
+                      <div className="flex flex-col gap-3">
+                        {typeof item.rating === "number" && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Star className="h-4 w-4 text-primary fill-primary" />
+                            <span>You rated this course {item.rating}/5</span>
+                          </div>
+                        )}
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Star className="h-4 w-4 text-primary fill-primary" />
+                            <span>
+                              {item.instructorId && instructorRatings[item.instructorId]
+                                ? `${instructorRatings[item.instructorId].average.toFixed(2)} • ${instructorRatings[item.instructorId].count} reviews`
+                                : "Instructor rating coming soon"}
+                            </span>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleLeaveFeedback(item.courseId, item.instructorId, item.title)}
+                          >
+                            Leave feedback
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </CardContent>
@@ -457,8 +625,8 @@ export default function StudentDashboard() {
                   durationMinutes={course.duration_minutes}
                   meetingLink={course.meeting_link}
                   detailHref={`/courses/${course.id}`}
-                  onSecondaryAction={() => handleLeaveFeedback(course.id)}
-                  secondaryActionLabel="Leave Feedback"
+                  ratingAverage={instructorRatings[course.instructor_id]?.average ?? null}
+                  ratingCount={instructorRatings[course.instructor_id]?.count ?? null}
                 />
               ))}
             </div>
@@ -466,50 +634,78 @@ export default function StudentDashboard() {
         )}
       </div>
 
-      <Dialog open={feedbackDialog} onOpenChange={setFeedbackDialog}>
-        <DialogContent>
+      <Dialog
+        open={feedbackDialog}
+        onOpenChange={(open) => {
+          setFeedbackDialog(open);
+          if (!open) {
+            setComment("");
+            setRating(5);
+            setSelectedCourse(null);
+            setFeedbackSubmitting(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Leave Feedback</DialogTitle>
+            <DialogTitle>
+              Share feedback{selectedCourse?.title ? ` for ${selectedCourse.title}` : ""}
+            </DialogTitle>
             <DialogDescription>
-              How was your experience with this course?
+              Rate the live session and help instructors keep improving.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="space-y-2">
               <Label>Rating</Label>
-              <div className="flex gap-2">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
+              <div className="flex flex-wrap gap-2">
+                {ratingChoices.map((value) => (
+                  <Button
+                    key={value}
                     type="button"
-                    onClick={() => setRating(star)}
-                    className="focus:outline-none"
+                    variant={rating >= value ? "default" : "outline"}
+                    onClick={() => setRating(value)}
+                    className="flex items-center gap-1"
                   >
                     <Star
-                      className={`h-8 w-8 ${
-                        star <= rating
-                          ? "fill-yellow-400 text-yellow-400"
-                          : "text-gray-300"
+                      className={`h-4 w-4 ${
+                        rating >= value ? "fill-primary text-primary" : "text-muted-foreground"
                       }`}
                     />
-                  </button>
+                    {value}
+                  </Button>
                 ))}
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="comment">Comments (optional)</Label>
+              <Label htmlFor="feedback-comment">Comments (optional)</Label>
               <Textarea
-                id="comment"
-                placeholder="Share your thoughts about the course..."
+                id="feedback-comment"
+                placeholder="What should we keep or improve for the next cohort?"
                 value={comment}
-                onChange={(e) => setComment(e.target.value)}
+                onChange={(event) => setComment(event.target.value)}
                 rows={4}
               />
             </div>
-            <Button onClick={handleSubmitFeedback} className="w-full">
-              Submit Feedback
-            </Button>
           </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setFeedbackDialog(false);
+                setComment("");
+                setRating(5);
+                setSelectedCourse(null);
+                setFeedbackSubmitting(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSubmitFeedback} disabled={feedbackSubmitting}>
+              {feedbackSubmitting ? "Saving..." : "Submit feedback"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

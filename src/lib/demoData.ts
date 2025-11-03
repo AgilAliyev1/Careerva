@@ -328,6 +328,150 @@ export const demoCourses: DemoCourse[] = [
     ],
     tools: ["Zoom", "Google Docs", "Voice Recorder", "Anki"],
   },
+  {
+    id: "demo-azure-ai-ops",
+    title: "Azure AI Ops in Production",
+    description: "Deploy and monitor AI workloads on Azure with confidence and control.",
+    category: "Programming",
+    instructor_id: "demo-instructor-ulvi",
+    scheduled_date: "2024-08-25T10:00:00.000Z",
+    duration_minutes: 90,
+    meeting_link: "https://meet.google.com/ai-ops-azr",
+    profiles: {
+      full_name: "Ulvi Bayramov",
+    },
+    level: "Advanced",
+    audience: "Cloud engineers and ML specialists deploying models to Azure at scale.",
+    longDescription:
+      "Roll out resilient AI workloads on Azure with observability, automation, and governance. Ulvi shares the exact playbooks used to keep enterprise inference humming.",
+    keyTakeaways: [
+      "Set up Azure Machine Learning for repeatable deployments",
+      "Automate retraining and rollbacks with Azure Pipelines",
+      "Wire up monitoring that blends telemetry with human-in-the-loop reviews",
+    ],
+    prerequisites: ["Experience with Azure fundamentals", "Exposure to machine learning lifecycles"],
+    modules: [
+      {
+        title: "Deployment Factory",
+        description: "Design a GitOps pipeline to promote models from staging to production.",
+      },
+      {
+        title: "Observability Dashboards",
+        description: "Instrument models with data drift, latency, and cost guardrails.",
+      },
+      {
+        title: "Responsible AI Reviews",
+        description: "Establish human checkpoints and escalation paths for high-risk releases.",
+      },
+    ],
+    resources: [
+      {
+        title: "Azure ML Deployment Checklist",
+        description: "Step-by-step launch guide with infrastructure as code templates.",
+      },
+      {
+        title: "Model Monitoring Dashboard",
+        description: "Power BI template tracking data drift, latency, and satisfaction.",
+      },
+    ],
+    tools: ["Azure Machine Learning", "Azure Monitor", "Power BI", "GitHub Actions"],
+  },
+  {
+    id: "demo-career-switch",
+    title: "Career Switch Bootcamp",
+    description: "Design a three-month roadmap to pivot into tech roles in Azerbaijan.",
+    category: "Business",
+    instructor_id: "demo-instructor-mentor",
+    scheduled_date: "2024-08-27T17:00:00.000Z",
+    duration_minutes: 80,
+    meeting_link: "https://meet.google.com/career-switch",
+    profiles: {
+      full_name: "Turgut Piriyev",
+    },
+    level: "Beginner",
+    audience: "Professionals planning a transition into product, design, or data roles.",
+    longDescription:
+      "Build momentum for your career change with a tactical plan, accountability, and local hiring insight. We'll map transferable skills, portfolio moves, and mentor touchpoints.",
+    keyTakeaways: [
+      "Clarify your target roles and value proposition",
+      "Stand up a project portfolio that speaks to Azerbaijani employers",
+      "Plan the next 90 days with measurable milestones",
+    ],
+    prerequisites: ["Motivation to transition into tech", "Willingness to show work weekly"],
+    modules: [
+      {
+        title: "Skill Inventory & Story",
+        description: "Audit your strengths and translate them into a tech narrative.",
+      },
+      {
+        title: "Project Launchpad",
+        description: "Scope 2-3 portfolio projects with mentor support.",
+      },
+      {
+        title: "Job Search Systems",
+        description: "Set up outreach cadences, community rituals, and accountability.",
+      },
+    ],
+    resources: [
+      {
+        title: "Career Switch Notion Board",
+        description: "Template to organise goals, mentors, and applications.",
+      },
+      {
+        title: "Portfolio Story Bank",
+        description: "Prompts for structuring compelling case studies.",
+      },
+    ],
+    tools: ["Notion", "Canva", "LinkedIn", "Google Sheets"],
+  },
+  {
+    id: "demo-creative-english",
+    title: "Creative English for Presenters",
+    description: "Unlock expressive English storytelling for pitches and stages.",
+    category: "Languages",
+    instructor_id: "demo-instructor-creative",
+    scheduled_date: "2024-08-29T19:00:00.000Z",
+    duration_minutes: 60,
+    meeting_link: "https://meet.google.com/creative-english",
+    profiles: {
+      full_name: "Khadija Karimova",
+    },
+    level: "Intermediate",
+    audience: "Presenters and students polishing English storytelling and delivery.",
+    longDescription:
+      "Bring colour and persuasion to your English presentations. Khadija helps you experiment with tone, cadence, and visuals tailored for Azerbaijani audiences.",
+    keyTakeaways: [
+      "Deliver vivid stories with advanced rhetorical devices",
+      "Design visuals that reinforce your message",
+      "Adopt rehearsal routines used by top presenters",
+    ],
+    prerequisites: ["Intermediate spoken English", "Comfort presenting in small groups"],
+    modules: [
+      {
+        title: "Voice Warmups",
+        description: "Drills to expand your vocal range and confidence.",
+      },
+      {
+        title: "Story Sculpting",
+        description: "Structure narratives with hooks, contrast, and emotion.",
+      },
+      {
+        title: "Stagecraft Lab",
+        description: "Practice delivery with live feedback from peers.",
+      },
+    ],
+    resources: [
+      {
+        title: "Presentation Blueprint",
+        description: "Google Slides template for high-impact presentations.",
+      },
+      {
+        title: "Storytelling Prompts",
+        description: "Creative prompts to unlock fresh angles for your talk.",
+      },
+    ],
+    tools: ["Google Slides", "Zoom", "Canva", "Obsidian"],
+  },
 ];
 
 export const demoStudentProgress = {
@@ -340,25 +484,34 @@ export const demoStudentProgress = {
   },
   completedCourses: [
     {
+      courseId: "demo-frontend",
       title: "Advanced Frontend Architecture",
       instructor: "Kamran Aliyev",
       completedOn: "2024-07-02",
       score: 96,
       skills: ["React", "TypeScript", "Design Systems"],
+      instructorId: "demo-instructor-2",
+      rating: 5,
     },
     {
+      courseId: "demo-brand-story",
       title: "Storytelling for Product Pitches",
       instructor: "Aysel Guliyeva",
       completedOn: "2024-06-18",
       score: 92,
       skills: ["Narratives", "Pitch Design", "Copywriting"],
+      instructorId: "demo-instructor-5",
+      rating: 4,
     },
     {
+      courseId: "demo-ux-research",
       title: "Leadership Communication Labs",
       instructor: "Rashad Huseynov",
       completedOn: "2024-06-04",
       score: 88,
       skills: ["Public Speaking", "Feedback", "Confidence"],
+      instructorId: "demo-instructor-3",
+      rating: 5,
     },
   ],
   assessments: [
@@ -407,4 +560,189 @@ export const demoStudentProgress = {
       action: "Share your revised pitch deck for review",
     },
   ],
+  reputation: {
+    rating: 4.9,
+    totalReviews: 18,
+    highlight: "Instructors praise your preparation and positive energy in every cohort.",
+  },
+};
+
+export const demoSubscriptionAssignments: Record<
+  string,
+  {
+    tier: "starter" | "growth" | "unlimited";
+    price: number;
+    coursesUsedThisMonth: number;
+    lastReset: string;
+  }
+> = {
+  "aqilliyev207@gmail.com": {
+    tier: "unlimited",
+    price: 100,
+    coursesUsedThisMonth: 7,
+    lastReset: "2024-07-01T00:00:00.000Z",
+  },
+  "aliyevagil21@gmail.com": {
+    tier: "starter",
+    price: 30,
+    coursesUsedThisMonth: 1,
+    lastReset: "2024-07-01T00:00:00.000Z",
+  },
+  "ulvibayramov1@gmail.com": {
+    tier: "growth",
+    price: 50,
+    coursesUsedThisMonth: 2,
+    lastReset: "2024-07-01T00:00:00.000Z",
+  },
+};
+
+export const demoInstructorRatings: Record<
+  string,
+  {
+    fullName: string;
+    rating: number;
+    totalReviews: number;
+    strengths: string[];
+    bio?: string;
+  }
+> = {
+  "demo-instructor-1": {
+    fullName: "Leyla Mammadova",
+    rating: 4.8,
+    totalReviews: 42,
+    strengths: ["Strategic clarity", "Accountability", "Investor insight"],
+  },
+  "demo-instructor-2": {
+    fullName: "Kamran Aliyev",
+    rating: 4.9,
+    totalReviews: 58,
+    strengths: ["Code quality", "Mentorship", "Accessibility"],
+  },
+  "demo-instructor-3": {
+    fullName: "Nigar Suleymanova",
+    rating: 4.7,
+    totalReviews: 31,
+    strengths: ["Workshop energy", "Frameworks", "Practical templates"],
+  },
+  "demo-instructor-4": {
+    fullName: "Elvin Rahimov",
+    rating: 4.6,
+    totalReviews: 24,
+    strengths: ["Financial rigor", "Automation", "Scenario planning"],
+  },
+  "demo-instructor-5": {
+    fullName: "Aysel Guliyeva",
+    rating: 4.9,
+    totalReviews: 65,
+    strengths: ["Storytelling", "Community", "Voice coaching"],
+  },
+  "demo-instructor-6": {
+    fullName: "Rashad Huseynov",
+    rating: 4.8,
+    totalReviews: 53,
+    strengths: ["Confidence", "Structure", "Personalised feedback"],
+  },
+  "demo-instructor-ulvi": {
+    fullName: "Ulvi Bayramov",
+    rating: 4.95,
+    totalReviews: 46,
+    strengths: ["Azure architecture", "AI operations", "Team leadership"],
+    bio: "Ulvi scales ML systems for energy and fintech teams, helping them deploy responsibly while shipping fast.",
+  },
+  "demo-instructor-mentor": {
+    fullName: "Turgut Piriyev",
+    rating: 4.85,
+    totalReviews: 39,
+    strengths: ["Career pivots", "Networking", "Hiring manager insight"],
+  },
+  "demo-instructor-creative": {
+    fullName: "Khadija Karimova",
+    rating: 4.92,
+    totalReviews: 28,
+    strengths: ["Stage presence", "Language coaching", "Confidence"],
+  },
+};
+
+export const demoForumThreads = [
+  {
+    id: "thread-ai-hiring",
+    title: "How do you position AI projects for conservative executives?",
+    author: "Leyla Mammadova",
+    role: "Mentor",
+    postedAt: "2024-07-10T09:00:00.000Z",
+    replies: 14,
+    excerpt: "I'm sharing the deck template I use to get CFO buy-in without overpromising outcomes.",
+    tags: ["Strategy", "Stakeholders"],
+  },
+  {
+    id: "thread-design-system",
+    title: "Design tokens for multi-brand systems",
+    author: "Kamran Aliyev",
+    role: "Instructor",
+    postedAt: "2024-07-12T14:30:00.000Z",
+    replies: 9,
+    excerpt: "Attached is the spreadsheet we use to sync tokens between retail and B2B products.",
+    tags: ["Frontend", "Design"],
+  },
+  {
+    id: "thread-ielts-confidence",
+    title: "IELTS Part 2 story structures",
+    author: "Rashad Huseynov",
+    role: "Instructor",
+    postedAt: "2024-07-14T18:15:00.000Z",
+    replies: 21,
+    excerpt: "Try the SPRE method. Sharing sample recordings and a printable cheat sheet.",
+    tags: ["IELTS", "Speaking"],
+  },
+];
+
+export const demoMentorDirectory = [
+  {
+    id: "mentor-1",
+    name: "Agil Aliyev",
+    expertise: ["Product strategy", "Growth", "Early-stage ops"],
+    bio: "Agil has launched three venture-backed startups and mentors founders on experimentation and fundraising.",
+    focus: "100$ Unlimited cohort",
+    officeHours: "Wednesdays 19:00-21:00",
+    tiers: ["unlimited"],
+  },
+  {
+    id: "mentor-2",
+    name: "Sara Aysun",
+    expertise: ["Finance", "Analytics", "Automation"],
+    bio: "Sara leads finance transformation programs and helps operators ship board-ready reporting in weeks.",
+    focus: "Growth tier accountability pods",
+    officeHours: "Mondays 18:00-20:00",
+    tiers: ["growth", "unlimited"],
+  },
+  {
+    id: "mentor-3",
+    name: "Leyla Tagizada",
+    expertise: ["HR", "Leadership", "Culture"],
+    bio: "Leyla has scaled HR teams across tech startups and guides students on interviewing and negotiation.",
+    focus: "Starter tier career clinics",
+    officeHours: "Fridays 17:30-19:00",
+    tiers: ["starter", "growth"],
+  },
+];
+
+export const demoInstructorSnapshots: Record<
+  string,
+  {
+    fullName: string;
+    specialties: string[];
+    headline: string;
+    upcomingCourseIds: string[];
+    rating: number;
+    totalReviews: number;
+  }
+> = {
+  "ulvibayramov1@gmail.com": {
+    fullName: "Ulvi Bayramov",
+    specialties: ["Azure ML", "Ops automation", "Responsible AI"],
+    headline: "Senior Cloud Architect guiding teams through reliable AI deployments.",
+    upcomingCourseIds: ["demo-azure-ai-ops"],
+    rating: 4.95,
+    totalReviews: 46,
+  },
 };
