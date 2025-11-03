@@ -71,32 +71,6 @@ export default function Subscription() {
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      if (!user) {
-        setTrialEndsAt(null);
-        setTrialStatus(null);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("trial_ends_at, trial_status")
-        .eq("id", user.id)
-        .single();
-
-      if (error) {
-        console.error("loadProfile", error);
-        return;
-      }
-
-      setTrialEndsAt(data?.trial_ends_at ?? null);
-      setTrialStatus(data?.trial_status ?? null);
-    };
-
-    loadProfile();
-  }, [user]);
-
   const checkoutLinks = useMemo(
     () => ({
       starter: import.meta.env.VITE_PADDLE_STARTER_CHECKOUT_URL,
@@ -105,15 +79,6 @@ export default function Subscription() {
     }),
     []
   );
-
-  const trialEndDate = trialEndsAt ? new Date(trialEndsAt) : null;
-  const now = new Date();
-  const isTrialActive = !!(trialEndDate && trialEndDate >= now);
-  const trialMessage = trialEndDate
-    ? isTrialActive
-      ? formatDistanceToNowStrict(trialEndDate)
-      : formatDistanceToNowStrict(trialEndDate, { addSuffix: true })
-    : null;
 
   const handleSubscribe = async (tier: typeof tiers[0]) => {
     if (!user) {
@@ -134,10 +99,6 @@ export default function Subscription() {
         throw new Error(
           "No checkout link configured for this plan. Please contact support."
         );
-      }
-
-      if (!user.email_confirmed_at) {
-        throw new Error("Please verify your email address before subscribing.");
       }
 
       const redirectUrl = new URL(checkoutUrl);
