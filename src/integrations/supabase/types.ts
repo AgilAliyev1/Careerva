@@ -113,6 +113,9 @@ export type Database = {
           full_name: string
           id: string
           role: Database["public"]["Enums"]["user_role"]
+          trial_ends_at: string
+          trial_started_at: string
+          trial_status: string
           updated_at: string
         }
         Insert: {
@@ -121,6 +124,9 @@ export type Database = {
           full_name: string
           id: string
           role?: Database["public"]["Enums"]["user_role"]
+          trial_ends_at?: string
+          trial_started_at?: string
+          trial_status?: string
           updated_at?: string
         }
         Update: {
@@ -129,6 +135,9 @@ export type Database = {
           full_name?: string
           id?: string
           role?: Database["public"]["Enums"]["user_role"]
+          trial_ends_at?: string
+          trial_started_at?: string
+          trial_status?: string
           updated_at?: string
         }
         Relationships: []
@@ -174,6 +183,90 @@ export type Database = {
           },
         ]
       }
+      course_enrollments: {
+        Row: {
+          consumed_at: string
+          course_id: string
+          id: string
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          user_id: string
+        }
+        Insert: {
+          consumed_at?: string
+          course_id: string
+          id?: string
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          user_id: string
+        }
+        Update: {
+          consumed_at?: string
+          course_id?: string
+          id?: string
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_enrollments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_enrollments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_ratings: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          rating: number
+          reviewer_user_id: string | null
+          target_role: string
+          target_user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          rating: number
+          reviewer_user_id?: string | null
+          target_role: string
+          target_user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          rating?: number
+          reviewer_user_id?: string | null
+          target_role?: string
+          target_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_ratings_reviewer_user_id_fkey"
+            columns: ["reviewer_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_ratings_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -183,7 +276,7 @@ export type Database = {
     }
     Enums: {
       course_category: "Programming" | "Design" | "Business" | "Languages"
-      subscription_tier: "basic" | "standard" | "premium"
+      subscription_tier: "starter" | "growth" | "unlimited"
       user_role: "student" | "instructor"
     }
     CompositeTypes: {

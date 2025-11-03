@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { format } from "date-fns";
 import {
@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Navbar } from "@/components/Navbar";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, isUsingDemoSupabase } from "@/integrations/supabase/client";
 import {
   Calendar,
   Clock,
@@ -25,13 +25,34 @@ import {
   BookOpen,
   ExternalLink,
   Layers,
+  Star,
 } from "lucide-react";
 import {
   DemoCourse,
   demoCourses,
   DemoCourseModule,
   DemoCourseResource,
+  demoInstructorRatings,
+  demoSubscriptionAssignments,
 } from "@/lib/demoData";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  subscriptionPlans,
+  getNormalizedTier,
+  getMonthlyAllowance,
+  NormalizedSubscriptionTier,
+} from "@/lib/subscriptionPlans";
+import type { User } from "@supabase/supabase-js";
 
 interface CourseDetail extends DemoCourse {
   instructorBio?: string;
@@ -55,6 +76,130 @@ const CourseDetailPage = () => {
   const { toast } = useToast();
   const [course, setCourse] = useState<CourseDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [subscriptionTier, setSubscriptionTier] = useState<NormalizedSubscriptionTier | null>(null);
+  const [monthlyAllowance, setMonthlyAllowance] = useState<number | null>(null);
+  const [usageCount, setUsageCount] = useState(0);
+  const [enrollmentStatus, setEnrollmentStatus] = useState<"idle" | "enrolled">("idle");
+  const [confirmSpendDialog, setConfirmSpendDialog] = useState(false);
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [instructorRating, setInstructorRating] = useState<{ average: number; count: number } | null>(null);
+  const plan = subscriptionTier ? subscriptionPlans[subscriptionTier] : null;
+  const creditsRemaining = useMemo(() => {
+    if (monthlyAllowance === null) return null;
+    return Math.max(monthlyAllowance - usageCount, 0);
+  }, [monthlyAllowance, usageCount]);
+
+  const loadInstructorRating = useCallback(async (instructorId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("user_ratings")
+        .select("rating")
+        .eq("target_user_id", instructorId);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const total = data.reduce((sum, item) => sum + (item?.rating ?? 0), 0);
+        const count = data.length;
+        setInstructorRating({
+          average: Number((total / count).toFixed(2)),
+          count,
+        });
+      } else if (demoInstructorRatings[instructorId]) {
+        const fallback = demoInstructorRatings[instructorId];
+        setInstructorRating({ average: fallback.rating, count: fallback.totalReviews });
+      } else {
+        setInstructorRating(null);
+      }
+    } catch (error: any) {
+      console.warn("loadInstructorRating", error.message);
+      if (demoInstructorRatings[instructorId]) {
+        const fallback = demoInstructorRatings[instructorId];
+        setInstructorRating({ average: fallback.rating, count: fallback.totalReviews });
+      }
+    }
+  }, []);
+
+  const loadSubscription = useCallback(
+    async (currentUser: User) => {
+      const fallback = currentUser.email ? demoSubscriptionAssignments[currentUser.email.toLowerCase()] : undefined;
+
+      if (isUsingDemoSupabase) {
+        if (fallback) {
+          setSubscriptionTier(fallback.tier);
+          setMonthlyAllowance(getMonthlyAllowance(fallback.tier));
+          setUsageCount(fallback.coursesUsedThisMonth);
+        } else {
+          setSubscriptionTier(null);
+          setMonthlyAllowance(null);
+          setUsageCount(0);
+        }
+        setEnrollmentStatus("idle");
+        return;
+      }
+
+      try {
+        const { data: subscriptionRow, error } = await supabase
+          .from("subscriptions")
+          .select("tier")
+          .eq("user_id", currentUser.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        const normalizedTier =
+          getNormalizedTier(subscriptionRow?.tier ?? null) ?? (fallback ? fallback.tier : null);
+
+        setSubscriptionTier(normalizedTier);
+        setMonthlyAllowance(getMonthlyAllowance(normalizedTier));
+
+        if (courseId) {
+          const { data: enrollmentRow, error: enrollmentError } = await supabase
+            .from("course_enrollments")
+            .select("id")
+            .eq("user_id", currentUser.id)
+            .eq("course_id", courseId)
+            .maybeSingle();
+
+          if (enrollmentError) throw enrollmentError;
+
+          setEnrollmentStatus(enrollmentRow ? "enrolled" : "idle");
+        } else {
+          setEnrollmentStatus("idle");
+        }
+
+        const startOfMonth = new Date();
+        startOfMonth.setUTCDate(1);
+        startOfMonth.setUTCHours(0, 0, 0, 0);
+
+        const { data: monthlyRows, error: monthlyError } = await supabase
+          .from("course_enrollments")
+          .select("id")
+          .eq("user_id", currentUser.id)
+          .gte("consumed_at", startOfMonth.toISOString());
+
+        if (monthlyError) throw monthlyError;
+
+        setUsageCount(monthlyRows?.length ?? (fallback?.coursesUsedThisMonth ?? 0));
+      } catch (error: any) {
+        console.warn("loadSubscription", error.message);
+        if (fallback) {
+          setSubscriptionTier(fallback.tier);
+          setMonthlyAllowance(getMonthlyAllowance(fallback.tier));
+          setUsageCount(fallback.coursesUsedThisMonth);
+        } else {
+          setSubscriptionTier(null);
+          setMonthlyAllowance(null);
+          setUsageCount(0);
+        }
+        setEnrollmentStatus("idle");
+      }
+    },
+    [courseId],
+  );
 
   const demoFallback = useMemo(
     () => demoCourses.find((item) => item.id === courseId),
@@ -133,6 +278,117 @@ const CourseDetailPage = () => {
     loadCourse();
   }, [courseId, demoFallback, toast]);
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        loadSubscription(session.user);
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        loadSubscription(session.user);
+      } else {
+        setSubscriptionTier(null);
+        setMonthlyAllowance(null);
+        setUsageCount(0);
+        setEnrollmentStatus("idle");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [loadSubscription]);
+
+  useEffect(() => {
+    if (course?.instructor_id) {
+      loadInstructorRating(course.instructor_id);
+    }
+  }, [course?.instructor_id, loadInstructorRating]);
+
+  const completeJoin = useCallback(async () => {
+    if (!course?.meeting_link || !user) {
+      setConfirmSpendDialog(false);
+      return;
+    }
+
+    setJoinLoading(true);
+
+    try {
+      let consumedCredit = false;
+      let alreadyEnrolled = enrollmentStatus === "enrolled";
+
+      if (monthlyAllowance !== null && !alreadyEnrolled && subscriptionTier) {
+        const { error } = await supabase.from("course_enrollments").insert({
+          course_id: course.id,
+          user_id: user.id,
+          tier: subscriptionTier,
+        });
+
+        if (error) {
+          const duplicateEnrollment =
+            error.code === "23505" ||
+            (typeof error.message === "string" && error.message.toLowerCase().includes("duplicate"));
+
+          if (duplicateEnrollment) {
+            alreadyEnrolled = true;
+          } else {
+            if (!isUsingDemoSupabase) {
+              toast({
+                variant: "destructive",
+                title: "We couldn't log your credit",
+                description: "Supabase was unavailable, but your live class is still opening.",
+              });
+            }
+
+            console.warn("completeJoin", error.message);
+            consumedCredit = true;
+            alreadyEnrolled = true;
+          }
+        } else {
+          consumedCredit = true;
+          alreadyEnrolled = true;
+        }
+      }
+
+      window.open(course.meeting_link, "_blank", "noopener,noreferrer");
+      toast({
+        title: "Opening live classroom",
+        description: "Your Google Meet session is launching in a new tab.",
+      });
+      setEnrollmentStatus("enrolled");
+
+      if (monthlyAllowance !== null && consumedCredit) {
+        setUsageCount((current) => current + 1);
+      }
+    } catch (error: any) {
+      if (!isUsingDemoSupabase) {
+        toast({
+          variant: "destructive",
+          title: "Unable to confirm your seat",
+          description: error.message,
+        });
+        setJoinLoading(false);
+        setConfirmSpendDialog(false);
+        return;
+      }
+
+      console.warn("completeJoin", error.message);
+      window.open(course.meeting_link, "_blank", "noopener,noreferrer");
+      toast({
+        title: "Opening live classroom",
+        description: "Your Google Meet session is launching in a new tab.",
+      });
+      setEnrollmentStatus("enrolled");
+    } finally {
+      setJoinLoading(false);
+      setConfirmSpendDialog(false);
+    }
+  }, [course, enrollmentStatus, monthlyAllowance, subscriptionTier, toast, user]);
+
   const handleJoinSession = () => {
     if (!course?.meeting_link) {
       toast({
@@ -143,11 +399,30 @@ const CourseDetailPage = () => {
       return;
     }
 
-    window.open(course.meeting_link, "_blank", "noopener,noreferrer");
-    toast({
-      title: "Opening live classroom",
-      description: "Your Google Meet session is launching in a new tab.",
-    });
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Log in to unlock live classroom links.",
+      });
+      navigate("/auth");
+      return;
+    }
+
+    if (monthlyAllowance !== null && enrollmentStatus !== "enrolled") {
+      if (usageCount >= monthlyAllowance) {
+        toast({
+          variant: "destructive",
+          title: "No credits remaining",
+          description: "Upgrade your plan or wait for your credits to refresh next month.",
+        });
+        return;
+      }
+
+      setConfirmSpendDialog(true);
+      return;
+    }
+
+    completeJoin();
   };
 
   return (
@@ -217,11 +492,39 @@ const CourseDetailPage = () => {
                       </div>
                     )}
                   </div>
+                  {plan && monthlyAllowance !== null && (
+                    <Alert
+                      variant={enrollmentStatus !== "enrolled" && creditsRemaining === 0 ? "destructive" : "default"}
+                    >
+                      <AlertTitle>
+                        {enrollmentStatus === "enrolled"
+                          ? "Seat already unlocked"
+                          : creditsRemaining === 0
+                          ? "No credits remaining"
+                          : `${creditsRemaining} credits left this month`}
+                      </AlertTitle>
+                      <AlertDescription>
+                        {enrollmentStatus === "enrolled"
+                          ? "You&apos;ve already used a credit for this session. Rejoin anytime."
+                          : `Joining will use 1 of your ${monthlyAllowance} monthly credits on the ${plan.name} plan.`}
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   <Separator />
                   <div className="flex flex-wrap gap-3">
-                    <Button className="flex-1 md:flex-none" onClick={handleJoinSession}>
+                    <Button
+                      className="flex-1 md:flex-none"
+                      onClick={handleJoinSession}
+                      disabled={
+                        joinLoading ||
+                        !course.meeting_link ||
+                        (monthlyAllowance !== null &&
+                          enrollmentStatus !== "enrolled" &&
+                          creditsRemaining === 0)
+                      }
+                    >
                       <ExternalLink className="h-4 w-4" />
-                      Join live session
+                      {joinLoading ? "Processing..." : "Join live session"}
                     </Button>
                     <Button asChild variant="outline">
                       <Link to="/courses">Browse more courses</Link>
@@ -312,6 +615,14 @@ const CourseDetailPage = () => {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <p className="font-semibold">{course.profiles.full_name}</p>
+                  {instructorRating && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Star className="h-4 w-4 text-primary fill-primary" />
+                      <span>
+                        {instructorRating.average.toFixed(2)} rating · {instructorRating.count} reviews
+                      </span>
+                    </div>
+                  )}
                   {course.instructorBio ? (
                     <p className="text-sm text-muted-foreground">{course.instructorBio}</p>
                   ) : (
@@ -364,6 +675,24 @@ const CourseDetailPage = () => {
           </div>
         )}
       </div>
+
+      <AlertDialog open={confirmSpendDialog} onOpenChange={setConfirmSpendDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Use one course credit?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Joining this live session will use one monthly credit from your
+              {plan ? ` ${plan.name}` : " current"} plan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={joinLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={completeJoin} disabled={joinLoading}>
+              {joinLoading ? "Confirming..." : "Use credit"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
@@ -11,7 +11,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
-import { User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { demoCourses as demoCatalog, DemoCourse, demoInstructorSnapshots } from "@/lib/demoData";
 
 interface Course {
   id: string;
@@ -35,7 +38,36 @@ export default function InstructorDashboard() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
-  
+  const [instructorProfile, setInstructorProfile] = useState<
+    | {
+        fullName: string;
+        headline: string;
+        specialties: string[];
+        rating: number;
+        totalReviews: number;
+      }
+    | null
+  >(null);
+  const [usingDemoData, setUsingDemoData] = useState(false);
+
+  const hydrateInstructorProfile = useCallback((currentUser: User) => {
+    const snapshot = currentUser.email
+      ? demoInstructorSnapshots[currentUser.email.toLowerCase()]
+      : undefined;
+
+    if (snapshot) {
+      setInstructorProfile({
+        fullName: snapshot.fullName,
+        headline: snapshot.headline,
+        specialties: snapshot.specialties,
+        rating: snapshot.rating,
+        totalReviews: snapshot.totalReviews,
+      });
+    } else {
+      setInstructorProfile(null);
+    }
+  }, []);
+
   const [formData, setFormData] = useState<{
     title: string;
     description: string;
@@ -54,6 +86,52 @@ export default function InstructorDashboard() {
     meetingLink: "",
   });
 
+  const fetchCourses = useCallback(
+    async (instructorId: string, instructorEmail?: string | null) => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("courses")
+          .select(`
+            *,
+            profiles!instructor_id (
+              full_name
+            )
+          `)
+          .eq("instructor_id", instructorId)
+          .order("scheduled_date", { ascending: true });
+
+        if (error) throw error;
+        setUsingDemoData(false);
+        setCourses(data || []);
+      } catch (error: any) {
+        toast({
+          variant: "destructive",
+          title: "Error loading courses",
+          description: error.message,
+        });
+
+        const fallbackEmail = instructorEmail?.toLowerCase();
+        const snapshot = fallbackEmail
+          ? demoInstructorSnapshots[fallbackEmail]
+          : undefined;
+        if (snapshot) {
+          const fallbackCourses = snapshot.upcomingCourseIds
+            .map((courseId) => demoCatalog.find((demoCourse) => demoCourse.id === courseId))
+            .filter((course): course is DemoCourse => Boolean(course))
+            .map((course) => ({ ...course })) as Course[];
+          setCourses(fallbackCourses);
+          setUsingDemoData(true);
+        } else {
+          setUsingDemoData(false);
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [toast],
+  );
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
@@ -61,43 +139,29 @@ export default function InstructorDashboard() {
         return;
       }
       setUser(session.user);
-      fetchCourses(session.user.id);
+      hydrateInstructorProfile(session.user);
+      fetchCourses(session.user.id, session.user.email);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_, session) => {
       if (!session) {
         navigate("/auth");
+        setUser(null);
+        setInstructorProfile(null);
+        setCourses([]);
+        setUsingDemoData(false);
+        setLoading(false);
+        return;
       }
+      setUser(session.user);
+      hydrateInstructorProfile(session.user);
+      fetchCourses(session.user.id, session.user.email);
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  const fetchCourses = async (instructorId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("courses")
-        .select(`
-          *,
-          profiles!instructor_id (
-            full_name
-          )
-        `)
-        .eq("instructor_id", instructorId)
-        .order("scheduled_date", { ascending: true });
-
-      if (error) throw error;
-      setCourses(data || []);
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error loading courses",
-        description: error.message,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [fetchCourses, hydrateInstructorProfile, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,6 +204,7 @@ export default function InstructorDashboard() {
 
       setDialogOpen(false);
       resetForm();
+      setLoading(true);
       fetchCourses(user.id);
     } catch (error: any) {
       toast({
@@ -192,6 +257,31 @@ export default function InstructorDashboard() {
             Create Course
           </Button>
         </div>
+
+        {instructorProfile && (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>{instructorProfile.headline}</CardTitle>
+              <CardDescription>
+                Rated {instructorProfile.rating.toFixed(2)} ({instructorProfile.totalReviews} reviews)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {usingDemoData
+                  ? "Demo stats are showing while Supabase syncs. Real feedback will replace these numbers automatically."
+                  : "These ratings update automatically from student reviews."}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {instructorProfile.specialties.map((specialty) => (
+                  <Badge key={specialty} variant="outline">
+                    {specialty}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {loading ? (
           <div className="text-center py-12">Loading courses...</div>
