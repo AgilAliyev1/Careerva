@@ -12,35 +12,10 @@ import Courses from "./pages/Courses";
 import CourseDetail from "./pages/CourseDetail";
 import About from "./pages/About";
 import NotFound from "./pages/NotFound";
+import { getRouterBasename } from "./lib/routerBase";
 
 const queryClient = new QueryClient();
-
-const computeBasename = () => {
-  const globalBase = (window as typeof window & {
-    __APP_BASE_PATH__?: string;
-  }).__APP_BASE_PATH__;
-
-  const declaredBase =
-    globalBase ?? import.meta.env.VITE_BASE_PATH ?? import.meta.env.BASE_URL ?? "/";
-
-  const normalized = new URL(declaredBase, window.location.origin).pathname.replace(
-    /\/$/,
-    "",
-  );
-
-  if (normalized || !window.location.hostname.endsWith("github.io")) {
-    return normalized;
-  }
-
-  const segments = window.location.pathname.split("/").filter(Boolean);
-  if (!segments.length) {
-    return "";
-  }
-
-  return `/${segments[0]}`;
-};
-
-const basename = computeBasename();
+const basename = getRouterBasename();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
