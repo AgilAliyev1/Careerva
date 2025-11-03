@@ -1,59 +1,23 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { User } from "@supabase/supabase-js";
-
-const tiers = [
-  {
-    name: "Starter",
-    price: 30,
-    tier: "starter" as const,
-    coursesPerMonth: 3,
-    features: [
-      "Access to any 3 live courses every month",
-      "Downloadable class resources",
-      "Standard community access",
-      "Email support",
-    ],
-  },
-  {
-    name: "Growth",
-    price: 50,
-    tier: "growth" as const,
-    coursesPerMonth: 5,
-    features: [
-      "Join 5 premium live courses every month",
-      "Course recordings saved for 30 days",
-      "Priority seat reservations",
-      "Mentor-led study group",
-    ],
-    popular: true,
-  },
-  {
-    name: "Unlimited",
-    price: 100,
-    tier: "unlimited" as const,
-    coursesPerMonth: null,
-    features: [
-      "Unlimited live course access",
-      "Lifetime access to recordings",
-      "VIP community channels",
-      "1:1 career coaching session each month",
-      "24/7 priority support",
-    ],
-  },
-];
+import type { User } from "@supabase/supabase-js";
+import { formatDistanceToNowStrict } from "date-fns";
+import { planList, SubscriptionPlan } from "@/lib/subscriptionPlans";
 
 export default function Subscription() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+  const [trialStatus, setTrialStatus] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -67,7 +31,51 @@ export default function Subscription() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleSubscribe = async (tier: typeof tiers[0]) => {
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user) {
+        setTrialEndsAt(null);
+        setTrialStatus(null);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("trial_ends_at, trial_status")
+        .eq("id", user.id)
+        .single();
+
+      if (error) {
+        console.error("loadProfile", error);
+        return;
+      }
+
+      setTrialEndsAt(data?.trial_ends_at ?? null);
+      setTrialStatus(data?.trial_status ?? null);
+    };
+
+    loadProfile();
+  }, [user]);
+
+  const checkoutLinks = useMemo(
+    () => ({
+      starter: import.meta.env.VITE_PADDLE_STARTER_CHECKOUT_URL,
+      growth: import.meta.env.VITE_PADDLE_GROWTH_CHECKOUT_URL,
+      unlimited: import.meta.env.VITE_PADDLE_UNLIMITED_CHECKOUT_URL,
+    }),
+    []
+  );
+
+  const trialEndDate = trialEndsAt ? new Date(trialEndsAt) : null;
+  const now = new Date();
+  const isTrialActive = !!(trialEndDate && trialEndDate >= now);
+  const trialMessage = trialEndDate
+    ? isTrialActive
+      ? formatDistanceToNowStrict(trialEndDate)
+      : formatDistanceToNowStrict(trialEndDate, { addSuffix: true })
+    : null;
+
+  const handleSubscribe = async (tier: SubscriptionPlan) => {
     if (!user) {
       toast({
         title: "Please sign in",
@@ -80,25 +88,29 @@ export default function Subscription() {
     setLoading(tier.tier);
 
     try {
-      const endDate = new Date();
-      endDate.setMonth(endDate.getMonth() + 1);
+      const checkoutUrl = checkoutLinks[tier.tier];
 
-      const { error } = await supabase.from("subscriptions").insert({
-        user_id: user.id,
-        tier: tier.tier,
-        price: tier.price,
-        status: "active",
-        end_date: endDate.toISOString(),
-      });
+      if (!checkoutUrl) {
+        throw new Error(
+          "No checkout link configured for this plan. Please contact support."
+        );
+      }
 
-      if (error) throw error;
+      if (!user.email_confirmed_at) {
+        throw new Error("Please verify your email address before subscribing.");
+      }
+
+      const redirectUrl = new URL(checkoutUrl);
+      if (user.email) {
+        redirectUrl.searchParams.set("customer_email", user.email);
+      }
 
       toast({
-        title: "Subscription successful!",
-        description: `You've subscribed to the ${tier.name} plan.`,
+        title: "Redirecting to secure checkout",
+        description: "You will be able to complete your payment on the next page.",
       });
 
-      navigate("/student-dashboard");
+      window.location.href = redirectUrl.toString();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -121,17 +133,54 @@ export default function Subscription() {
           </p>
         </div>
 
+        <div className="max-w-3xl mx-auto mb-10 space-y-4">
+          <Alert>
+            <AlertTitle>Start with a free 7-day trial</AlertTitle>
+            <AlertDescription>
+              Every new student account is activated with a full-access trial. When your trial ends, you&apos;ll need an active
+              subscription to keep attending live lessons.
+            </AlertDescription>
+          </Alert>
+
+          {user && trialEndDate && trialMessage && (
+            <Alert variant="default">
+              <AlertTitle>
+                {trialStatus === "active"
+                  ? "Your trial countdown"
+                  : "Trial completed"}
+              </AlertTitle>
+              <AlertDescription>
+                {isTrialActive
+                  ? `You have ${trialMessage} remaining in your free trial.`
+                  : `Your complimentary access ended ${trialMessage}. Choose a plan below to continue learning.`}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {!user && (
+            <Alert variant="default">
+              <AlertTitle>Sign in to redeem your trial</AlertTitle>
+              <AlertDescription>
+                Create a student account or log in to start your 7-day full access period. You can subscribe anytime to avoid
+                interruptions.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+
         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {tiers.map((tier) => (
-            <Card
-              key={tier.tier}
+          {planList.map((tier) => {
+            const isPopular = tier.tier === "growth";
+            return (
+              <Card
+                key={tier.tier}
               className={`relative ${
-                tier.popular
+                isPopular
                   ? "border-primary shadow-[var(--card-hover-shadow)] scale-105"
                   : ""
               }`}
             >
-              {tier.popular && (
+              {isPopular && (
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                   <span className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-semibold">
                     Most Popular
@@ -146,6 +195,9 @@ export default function Subscription() {
                   </span>
                   <span className="text-muted-foreground">/month</span>
                 </CardDescription>
+                {tier.highlight && (
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">{tier.highlight}</p>
+                )}
                 <p className="text-sm font-medium text-primary">
                   {tier.coursesPerMonth
                     ? `${tier.coursesPerMonth} curated courses every month`
@@ -165,21 +217,20 @@ export default function Subscription() {
               <CardFooter>
                 <Button
                   className="w-full"
-                  variant={tier.popular ? "default" : "outline"}
+                  variant={isPopular ? "default" : "outline"}
                   onClick={() => handleSubscribe(tier)}
                   disabled={loading === tier.tier}
                 >
                   {loading === tier.tier ? "Processing..." : "Subscribe Now"}
                 </Button>
               </CardFooter>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
 
         <div className="text-center mt-12 text-sm text-muted-foreground">
-          <p>
-            * This is a demo payment system. No actual charges will be made.
-          </p>
+          <p>Payments are securely processed by Paddle.</p>
         </div>
       </div>
     </div>

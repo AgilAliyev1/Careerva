@@ -4,7 +4,7 @@ import { LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
-import { User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
 import { CareervaLogo } from "./CareervaLogo";
 
 export const Navbar = () => {
@@ -67,6 +67,15 @@ export const Navbar = () => {
             </Link>
             <Link to="/about" className="text-sm font-medium hover:text-primary transition-colors">
               About
+            </Link>
+            <Link to="/contact" className="text-sm font-medium hover:text-primary transition-colors">
+              Contact
+            </Link>
+            <Link to="/mentors" className="text-sm font-medium hover:text-primary transition-colors">
+              Mentors
+            </Link>
+            <Link to="/forum" className="text-sm font-medium hover:text-primary transition-colors">
+              Forum
             </Link>
             {user && userRole === "student" && (
               <Link to="/student-dashboard" className="text-sm font-medium hover:text-primary transition-colors">
