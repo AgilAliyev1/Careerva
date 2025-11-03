@@ -35,12 +35,8 @@
         var path = parts.shift() || "";
         var query = parts.length ? "?" + parts.join("&") : "";
         var base = (window.__APP_BASE_PATH__ || "").replace(/\/$/, "");
-        var nextPath = base + (path ? "/" + path : "");
-        if (!nextPath) {
-          nextPath = "/";
-        }
-
-        window.history.replaceState(null, "", nextPath.replace(/\/{2,}/g, "/") + query + l.hash);
+        var newPath = (base || "/") + (path ? "/" + path : "");
+        window.history.replaceState(null, "", newPath + query + l.hash);
       })();
     </script>
     <div id="root"></div>
