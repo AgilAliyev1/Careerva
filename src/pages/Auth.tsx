@@ -8,7 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { CareervaLogo } from "@/components/CareervaLogo";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -16,8 +24,12 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState<"student" | "instructor">("student");
-  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("signin");
+  const [signInLoading, setSignInLoading] = useState(false);
+  const [signUpLoading, setSignUpLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -29,7 +41,7 @@ export default function Auth() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSignUpLoading(true);
 
     try {
       const { error } = await supabase.auth.signUp({
@@ -38,20 +50,22 @@ export default function Auth() {
         options: {
           data: {
             full_name: fullName,
-            role: role,
+            role: "student",
           },
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/auth?verified=1`,
         },
       });
 
       if (error) throw error;
 
       toast({
-        title: "Success!",
-        description: "Choose a subscription plan to unlock live courses.",
+        title: "Verify your email",
+        description:
+          "We sent you a confirmation link. Verify your address to activate your 7-day trial and sign in.",
       });
 
-      navigate("/subscription");
+      setPassword("");
+      setActiveTab("signin");
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -59,27 +73,54 @@ export default function Auth() {
         description: error.message,
       });
     } finally {
-      setLoading(false);
+      setSignUpLoading(false);
     }
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSignInLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) throw error;
 
+      const signedInUser = data.user;
+
+      if (signedInUser && !signedInUser.email_confirmed_at) {
+        await supabase.auth.signOut();
+        toast({
+          variant: "destructive",
+          title: "Verify your email",
+          description: "Confirm the link we sent before signing in.",
+        });
+        return;
+      }
+
+      if (signedInUser) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", signedInUser.id)
+          .single();
+
+        if (profile?.role === "instructor") {
+          navigate("/instructor-dashboard");
+        } else {
+          navigate("/student-dashboard");
+        }
+      } else {
+        navigate("/");
+      }
+
       toast({
         title: "Welcome back!",
         description: "You have successfully signed in.",
       });
-      navigate("/");
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -87,7 +128,34 @@ export default function Auth() {
         description: error.message,
       });
     } finally {
-      setLoading(false);
+      setSignInLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/auth?passwordUpdated=1`,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Check your inbox",
+        description: "We sent password reset instructions to your email.",
+      });
+      setResetDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Unable to send reset email",
+        description: error.message,
+      });
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -104,7 +172,7 @@ export default function Auth() {
           <CardDescription>Sign in to access live courses</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="signin" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -134,8 +202,21 @@ export default function Auth() {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Signing in..." : "Sign In"}
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="px-0 text-sm"
+                    onClick={() => {
+                      setResetEmail(email);
+                      setResetDialogOpen(true);
+                    }}
+                  >
+                    Forgot password?
+                  </Button>
+                </div>
+                <Button type="submit" className="w-full" disabled={signInLoading}>
+                  {signInLoading ? "Signing in..." : "Sign In"}
                 </Button>
               </form>
             </TabsContent>
@@ -175,31 +256,59 @@ export default function Auth() {
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>I want to</Label>
-                  <RadioGroup value={role} onValueChange={(v) => setRole(v as "student" | "instructor")}>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="student" id="student" />
-                      <Label htmlFor="student" className="font-normal">
-                        Learn as a Student
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="instructor" id="instructor" />
-                      <Label htmlFor="instructor" className="font-normal">
-                        Teach as an Instructor
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Creating account..." : "Sign Up"}
+                <Alert>
+                  <AlertTitle>7-day student trial</AlertTitle>
+                  <AlertDescription>
+                    Every new student account gets full access for 7 days. Subscribe before your trial ends to
+                    keep learning.
+                  </AlertDescription>
+                </Alert>
+                <Alert variant="default" className="bg-muted/50">
+                  <AlertTitle>Instructors</AlertTitle>
+                  <AlertDescription>
+                    Our team will email your login credentials directly. Instructor self-signup is currently disabled for the
+                    MVP.
+                  </AlertDescription>
+                </Alert>
+                <Button type="submit" className="w-full" disabled={signUpLoading}>
+                  {signUpLoading ? "Creating account..." : "Sign Up"}
                 </Button>
               </form>
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
+
+      <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <DialogContent>
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <DialogHeader>
+              <DialogTitle>Reset password</DialogTitle>
+              <DialogDescription>
+                Enter the email associated with your account and we&apos;ll send a reset link.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="reset-email">Email</Label>
+              <Input
+                id="reset-email"
+                type="email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setResetDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={resetLoading}>
+                {resetLoading ? "Sending..." : "Send reset link"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

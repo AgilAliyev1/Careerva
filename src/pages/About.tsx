@@ -25,6 +25,29 @@ export default function About() {
               and engaging for everyone, regardless of their location.
             </p>
 
+            <h2 className="text-3xl font-bold mb-4">About Us</h2>
+            <p className="text-lg leading-relaxed mb-6">
+              Careerva is led by a multidisciplinary founding team committed to helping students thrive. We&apos;ll be sharing our
+              full story, photos, and contact details soon, but here&apos;s who is building the platform today:
+            </p>
+
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-10">
+              {[
+                { label: "Agil — IT" },
+                { label: "Turgut — PR" },
+                { label: "KHADIJA" },
+                { label: "LEYLA — HR" },
+                { label: "AYSUN SARA — Finance" },
+              ].map((member) => (
+                <div key={member.label} className="rounded-xl border bg-card p-5 shadow-sm">
+                  <p className="text-xl font-semibold tracking-wide uppercase">{member.label}</p>
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Personal bios, portraits, and contact details will appear here soon.
+                  </p>
+                </div>
+              ))}
+            </div>
+
             <div className="grid md:grid-cols-2 gap-8 my-12">
               <div className="space-y-4">
                 <div className="flex items-start gap-3">
@@ -88,6 +111,11 @@ export default function About() {
               Our mission is to democratize education by providing affordable, high-quality live
               courses to students across Azerbaijan. We connect passionate instructors with eager
               learners, creating a vibrant community of knowledge sharing and growth.
+            </p>
+
+            <p className="text-lg leading-relaxed mb-6">
+              Want to get in touch? Visit our dedicated <strong>Contact Us</strong> page to leave a message. We&apos;ll share phone
+              numbers, office hours, and social media links there soon.
             </p>
 
             <h2 className="text-3xl font-bold mb-4">How It Works</h2>

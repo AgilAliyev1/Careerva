@@ -11,17 +11,12 @@ import Subscription from "./pages/Subscription";
 import Courses from "./pages/Courses";
 import CourseDetail from "./pages/CourseDetail";
 import About from "./pages/About";
+import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 import { getRouterBasename } from "./lib/routerBase";
 
 const queryClient = new QueryClient();
 const basename = getRouterBasename();
-
-const basename = new URL(
-  import.meta.env.BASE_URL,
-  window.location.origin,
-)
-  .pathname.replace(/\/$/, "");
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -38,6 +33,7 @@ const App = () => (
           <Route path="/courses" element={<Courses />} />
           <Route path="/courses/:courseId" element={<CourseDetail />} />
           <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
