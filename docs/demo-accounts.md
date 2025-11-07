@@ -6,7 +6,7 @@ Use these notes to seed Supabase with the accounts referenced in the product dem
 
 | Email | Plan | Notes |
 | --- | --- | --- |
-| `aqilliyev207@gmail.com` | Unlimited (`unlimited`) | Primary student in the demo. Seed with verified email and mark the subscription as active so the forum unlocks. |
+| `member@gmail.com` | Unlimited (`unlimited`) | Primary student in the demo. Seed with verified email and mark the subscription as active so the forum unlocks. |
 | `aliyevagil21@gmail.com` | Starter (`starter`) | 3 credits per month. Use this account to test the confirmation dialog when joining a course. |
 | `demo@careerva.test` | Growth (`growth`) | Optional sandbox student with 5 credits per month. |
 
@@ -15,7 +15,7 @@ Create or update the profile, subscription, and credit usage with the following 
 ```sql
 insert into profiles (id, email, full_name, role, trial_started_at, trial_ends_at, trial_status)
 values
-  ('{uuid_aqilliyev}', 'aqilliyev207@gmail.com', 'Demo Learner', 'student', now(), now() + interval '7 days', 'expired')
+  ('{uuid_aqilliyev}', 'member@gmail.com', 'Demo Learner', 'student', now(), now() + interval '7 days', 'expired')
   on conflict (id) do update set email = excluded.email;
 
 insert into subscriptions (user_id, tier, price, status, start_date)

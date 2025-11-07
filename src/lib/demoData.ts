@@ -1,4 +1,4 @@
-export const DEMO_ACCOUNT_EMAIL = "aqilliyev207@gmail.com";
+export const DEMO_ACCOUNT_EMAIL = "member@gmail.com";
 
 export interface DemoCourseProfile {
   full_name: string;

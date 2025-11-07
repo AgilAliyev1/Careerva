@@ -74,6 +74,9 @@ export const Navbar = () => {
             <Link to="/mentors" className="text-sm font-medium hover:text-primary transition-colors">
               Mentors
             </Link>
+            <Link to="/subscription" className="text-sm font-medium hover:text-primary transition-colors">
+              Pricing
+            </Link>
             <Link to="/forum" className="text-sm font-medium hover:text-primary transition-colors">
               Forum
             </Link>
