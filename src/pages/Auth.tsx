@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import type { User } from "@supabase/supabase-js";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -39,6 +40,39 @@ export default function Auth() {
     });
   }, [navigate]);
 
+  const navigateAfterAuth = async (signedInUser: User | null) => {
+    if (!signedInUser) {
+      navigate("/");
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", signedInUser.id)
+      .single();
+
+    if (profile?.role === "instructor") {
+      navigate("/instructor-dashboard");
+    } else {
+      navigate("/student-dashboard");
+    }
+  };
+
+  const ensureEmailConfirmed = async (signedInUser: User | null) => {
+    if (signedInUser && !signedInUser.email_confirmed_at) {
+      await supabase.auth.signOut();
+      toast({
+        variant: "destructive",
+        title: "Verify your email",
+        description: "Confirm the link we sent before signing in.",
+      });
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setSignUpLoading(true);
@@ -56,7 +90,38 @@ export default function Auth() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        const normalizedMessage = error.message?.toLowerCase?.() ?? "";
+
+        if (
+          normalizedMessage.includes("already registered") ||
+          normalizedMessage.includes("already exists")
+        ) {
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+
+          if (signInError) throw signInError;
+
+          const existingUser = signInData.user ?? null;
+
+          const isConfirmed = await ensureEmailConfirmed(existingUser);
+          if (!isConfirmed) {
+            return;
+          }
+
+          await navigateAfterAuth(existingUser);
+
+          toast({
+            title: "Welcome back!",
+            description: "We recognised your account and signed you in.",
+          });
+          return;
+        }
+
+        throw error;
+      }
 
       toast({
         title: "Verify your email",
@@ -91,31 +156,12 @@ export default function Auth() {
 
       const signedInUser = data.user;
 
-      if (signedInUser && !signedInUser.email_confirmed_at) {
-        await supabase.auth.signOut();
-        toast({
-          variant: "destructive",
-          title: "Verify your email",
-          description: "Confirm the link we sent before signing in.",
-        });
+      const isConfirmed = await ensureEmailConfirmed(signedInUser);
+      if (!isConfirmed) {
         return;
       }
 
-      if (signedInUser) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", signedInUser.id)
-          .single();
-
-        if (profile?.role === "instructor") {
-          navigate("/instructor-dashboard");
-        } else {
-          navigate("/student-dashboard");
-        }
-      } else {
-        navigate("/");
-      }
+      await navigateAfterAuth(signedInUser);
 
       toast({
         title: "Welcome back!",
